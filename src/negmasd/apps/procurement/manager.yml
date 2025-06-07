@@ -1,0 +1,12 @@
+name: manager
+port: 9000
+negotiations:
+  - name: trade
+    partners: [seller, buyer]
+    issues:
+      - name: price
+        type: int-list
+        values: [100, 150, 200, 250, 300]
+      - name: quantity
+        type: int-range
+        values: [1, 10]

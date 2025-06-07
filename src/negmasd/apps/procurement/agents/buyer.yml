@@ -1,0 +1,27 @@
+name: buyer
+port: 8001
+negotiations:
+  - name: trade
+    partners: [seller]
+    issues:
+      - name: price
+        type: int-list
+        values: [100, 150, 200, 250, 300]
+      - name: quantity
+        type: int-range
+        values: [1, 10]
+    ufun:
+      type: LinearAggregationUtilityFunction
+      params:
+        weights: [0.00166667, 0.05]
+        values:
+          - type: AffineFun
+            params:
+              slope: -1
+              intercept: 1
+          - type: LineaerFun
+            params:
+              slope: 1
+        reserved_value: 0.1
+
+
