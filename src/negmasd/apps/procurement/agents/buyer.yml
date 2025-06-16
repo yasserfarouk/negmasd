@@ -1,27 +1,37 @@
 name: buyer
 port: 8001
 negotiations:
-  - name: trade
-    partners: [seller]
-    issues:
-      - name: price
-        type: int-list
-        values: [100, 150, 200, 250, 300]
-      - name: quantity
-        type: int-range
-        values: [1, 10]
+  trade:  
+    name: trade
+    partners:
+      - name: buyer
+        address: localhost
+        port: 8001
+      - name: seller
+        address: localhost
+        port: 8002
+    mechanism: 
+      type: negmas.sao.SAOMechanism
+      n_steps: 100
+      time_limit: 180
+    negotiator:
+      type: "negmas.sao.negotiators.BoulwareNegotiator"
     ufun:
-      type: LinearAggregationUtilityFunction
-      params:
-        weights: [0.00166667, 0.05]
-        values:
-          - type: AffineFun
-            params:
-              slope: -1
-              intercept: 1
-          - type: LineaerFun
-            params:
-              slope: 1
-        reserved_value: 0.1
-
-
+      type: negmas.preferences.linear.LinearAggregationUtilityFunction
+      weights: [0.00166667, 0.05]
+      values:
+        - type: negmas.preferences.fun.AffineFun
+          slope: -1
+          intercept: 1
+        - type: negmas.preferences.fun.LinearFun
+          slope: 1
+      outcome_space:
+        type: negmas.outcomes.DiscreteCartesianOutcomeSpace
+        issues:
+          - name: price
+            type: negmas.outcomes.CardinalIssue
+            values: [100, 150, 200, 250, 300]
+          - name: quantity
+            type: negmas.outcomes.ContighousIssue
+            values: [1, 10]
+      reserved_value: 0.1
