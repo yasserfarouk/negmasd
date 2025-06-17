@@ -1,4 +1,16 @@
 # A simple wrapper around negmas
+This repo provides a simple wrapper for running negotiations between agents on different processes/machines.
+
+
+## Installation
+
+After installing [uv](https://docs.astral.sh/uv/), clone this repo then:
+
+```bash
+uv sync
+```
+
+## Introduction
 
 The main implementation files are the following:
 
@@ -15,6 +27,9 @@ negmasd --help
 
 ```
 
+
+
+## Simple Scenario
 You can try a simple scenario using:
 
 ```bash
