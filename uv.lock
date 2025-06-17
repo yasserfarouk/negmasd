@@ -702,10 +702,6 @@ dependencies = [
     { name = "requests" },
     { name = "streamlit" },
     { name = "typer" },
-]
-
-[package.optional-dependencies]
-dev = [
     { name = "uvicorn" },
 ]
 
@@ -719,7 +715,7 @@ requires-dist = [
     { name = "requests", specifier = ">=2.32.3" },
     { name = "streamlit", specifier = ">=1.45.1" },
     { name = "typer", specifier = ">=0.16.0" },
-    { name = "uvicorn", marker = "extra == 'dev'", specifier = ">=0.34.3" },
+    { name = "uvicorn", specifier = ">=0.34.3" },
 ]
 
 [[package]]

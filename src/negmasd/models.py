@@ -1,13 +1,54 @@
+from negmas import BaseUtilityFunction, Mechanism, Negotiator, OutcomeSpace
 from pydantic import BaseModel, Field
+from .constants import RUNNER_DEFAULT_PORT
 
 
 class PartnerModel(BaseModel):
     name: str = Field(description="Name of the partner")
-    host: str = Field(default="", description="Host of the partner")
+    host: str = Field(default="127.0.0.1", description="Host of the partner")
     port: int = Field(default=0, description="Port of the partner")
 
 
-class NegotiatorModel(BaseModel):
+class StrModel(BaseModel):
+    value: str = Field(description="String value")
+
+
+class MakableModel[T](BaseModel):
+    type: str = Field(
+        description="NegMAS type to make",
+    )
+
+    def make_object(self, **kwargs) -> T | None:
+        """
+        Create a Mechanism instance based on the type.
+        """
+        from negmas.serialization import deserialize
+
+        if not self.type:
+            return None
+
+        dparams = dict(
+            python_class_identifier="type",
+            remove_type_field=True,
+        )
+        return deserialize(self.model_dump() | kwargs, **dparams)  # type: ignore
+
+
+class OutcomeSpaceModel(MakableModel[OutcomeSpace]):
+    """
+    Model to hold negotiator information.
+    """
+
+    type: str = Field(
+        default="negmas.outcomes.outcome_space.DiscreteCartesianOutcomeSpace",
+        description="Outcome-space to use for a negotiation",
+    )
+
+    class Config:
+        extra = "allow"
+
+
+class NegotiatorModel(MakableModel[Negotiator]):
     """
     Model to hold negotiator information.
     """
@@ -21,11 +62,7 @@ class NegotiatorModel(BaseModel):
         extra = "allow"
 
 
-class StrModel(BaseModel):
-    value: str = Field(description="String value")
-
-
-class MechanismModel(BaseModel):
+class MechanismModel(MakableModel[Mechanism]):
     """
     Base class for mechanism models.
     """
@@ -38,7 +75,7 @@ class MechanismModel(BaseModel):
         extra = "allow"
 
 
-class UtilityFunctionModel(BaseModel):
+class UtilityFunctionModel(MakableModel[BaseUtilityFunction]):
     """
     Base class for utility function models.
     """
@@ -57,6 +94,9 @@ class NegotiationModel(BaseModel):
     name: str = Field(description="Name of the negotiation")
     partners: list[PartnerModel] = Field(
         description="List of partner names involved in the negotiation"
+    )
+    outcome_space: OutcomeSpaceModel = Field(
+        default_factory=OutcomeSpaceModel, description="Outcome space information"
     )
     mechanism: MechanismModel = Field(
         default_factory=MechanismModel,
@@ -86,6 +126,7 @@ class PersonalNegotiationModel(NegotiationModel):
             partners=self.partners,
             mechanism=self.mechanism,
             random_order=self.random_order,
+            outcome_space=self.outcome_space,
         )
 
 
@@ -101,7 +142,8 @@ class AgentConfigModel(BaseModel):
         default="127.0.0.1", description="Host to run the agent on"
     )
     runner_port: int = Field(
-        default=9000, description="Role of the agent in the negotiation process"
+        default=RUNNER_DEFAULT_PORT,
+        description="Role of the agent in the negotiation process",
     )
     negotiations: dict[str, PersonalNegotiationModel] = Field(
         default_factory=dict,
@@ -132,13 +174,13 @@ class NegotiationInfoModel(BaseModel):
     )
 
 
-class NegResponseModel(BaseModel):
+class NegResponseModel(ResponseModel):
     """
     Response model for negotiation acceptance.
     """
 
     accepted: bool = Field(
-        default=True, description="Whether the negotiation was accepted"
+        default=False, description="Whether the negotiation was accepted"
     )
 
 
