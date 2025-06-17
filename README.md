@@ -4,9 +4,9 @@ The main implementation files are the following:
 
 - `agent.py` Implements an agent that can engage in negotiation
 - `runner.py` Implements a service that can run a negotiation locally based on information provided by agents and log/report results.
-- `cli.py` Implements a simple CLI to start agents, runners and apps
+- `cli.py` Implements a simple CLI to start agents; runners and apps
 
-An app is defined by a set of agent configs and (optinoall) a runner config. For an example, see `src/negamasd/procurement`
+An app is defined by a set of agent configs and (optionally) a runner config. For an example, see `src/negamasd/procurement`
 
 You can see the available functionality of the CLI using:
 
