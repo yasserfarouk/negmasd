@@ -19,6 +19,9 @@ dependencies = [
     "uvicorn>=0.34.3",
 ]
 
+[tool.uv.sources]
+negmas = { path = "../negmas", editable = true }
+
 [project.scripts]
 negmasd = "negmasd:cli.app"
 
