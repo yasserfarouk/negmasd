@@ -1,0 +1,38 @@
+name: seller
+port: 8002
+negotiations:
+  trade:
+    name: trade
+    partners:
+      - name: buyer
+        address: 127.0.0.1
+        port: 8001
+      - name: seller
+        address: 127.0.0.1
+        port: 8002
+    outcome_space:
+      type: negmas.outcomes.DiscreteCartesianOutcomeSpace
+      issues:
+        - name: price
+          type: negmas.outcomes.DiscreteCardinalIssue
+          values: [100, 150, 200, 250, 300]
+        - name: quantity
+          type: negmas.outcomes.ContiguousIssue
+          values: [1, 10]
+    mechanism: 
+      type: negmas.sao.SAOMechanism
+      n_steps: 200
+      time_limit: 60
+    negotiator:
+      type: "negmas.sao.negotiators.BoulwareTBNegotiator"
+      name: seller
+      id: seller
+    ufun:
+      type: negmas.preferences.crisp.linear.LinearAdditiveUtilityFunction
+      weights: [0.00166667, 0.05]
+      values:
+        - type: negmas.preferences.value_fun.LinearFun
+          slope: 1
+        - type: negmas.preferences.value_fun.LinearFun
+          slope: 1
+      reserved_value: 0.1
