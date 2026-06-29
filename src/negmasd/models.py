@@ -106,6 +106,24 @@ class NegotiationModel(BaseModel):
         default=False,
         description="Randomize the order of partners when starting the negotiation",
     )
+    mode: str = Field(
+        default="distributed",
+        description=(
+            "Execution mode: 'distributed' (default; runner runs the real"
+            " mechanism but forwards every per-round negotiator call to the"
+            " partner's own process, so strategy + ufun never leave it) or"
+            " 'centralized' (runner pulls each partner's strategy + ufun and"
+            " runs the whole negotiation locally)."
+        ),
+    )
+    seed: int | None = Field(
+        default=None,
+        description=(
+            "If set, the runner seeds the global RNG with this value immediately"
+            " before running the mechanism. Required for bit-exact reproducibility"
+            " (e.g. random first-proposer selection) across runs/machines."
+        ),
+    )
 
 
 class PersonalNegotiationModel(NegotiationModel):
@@ -201,3 +219,14 @@ class NegResultsModel(BaseModel):
     negid: str = Field(description="Unique identifier for the negotiation")
     agreement: tuple | None = Field(description="Agreement")
     state: dict = Field(description="Final state")
+
+
+class RespondRequest(BaseModel):
+    """Distributed mode: ask an agent for one negotiator response.
+
+    ``state`` is a JSON-encoded ``SAOState`` (see ``negmasd.wire``). The agent
+    returns a JSON-encoded ``SAOResponse``.
+    """
+
+    negid: str = Field(description="Unique identifier for the negotiation")
+    state: dict = Field(description="Wire-encoded SAOState for the current round")

@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import TypedDict
 from fastapi import FastAPI
+from negmas import Negotiator
 from rich import print
 from yaml import safe_load
 from negmasd.models import (
@@ -8,6 +9,7 @@ from negmasd.models import (
     NegStrategyModel,
     PartnerModel,
     PersonalNegotiationModel,
+    RespondRequest,
     ResponseModel,
     AgentConfigModel,
     NegotiationInfoModel,
@@ -16,6 +18,7 @@ from negmasd.models import (
 from uuid import uuid4
 
 from .common import SUCCESS, FAILURE, get_response
+from .wire import decode_state, encode_response
 
 
 class SessionResultsDict(TypedDict):
@@ -30,6 +33,29 @@ config: AgentConfigModel | None = None
 sessions_started: dict[str, PersonalNegotiationModel] = {}
 sessions_accepted: dict[str, PersonalNegotiationModel] = {}
 sessions_ended: dict[str, SessionResultsDict] = {}
+# Distributed mode: the real, live negotiator object for each negotiation,
+# kept in *this* process across all rounds.
+live_negotiators: dict[str, Negotiator] = {}
+
+
+def build_negotiator(info: PersonalNegotiationModel) -> Negotiator:
+    """Instantiate this agent's real negotiator + ufun, locally.
+
+    The ufun carries the outcome space, so the negotiator is fully functional
+    standalone (no mechanism join needed for time-based strategies). This is the
+    object that lives in the agent's own process in distributed mode.
+    """
+    os = info.outcome_space.make_object()
+    ufun = info.ufun.make_object(outcome_space=os) if info.ufun is not None else None
+    if ufun is not None:
+        negotiator = info.negotiator.make_object(preferences=ufun)
+    else:
+        negotiator = info.negotiator.make_object()
+    if negotiator is None:
+        raise ValueError(f"Could not build negotiator from {info.negotiator}")
+    if ufun is not None:
+        negotiator.set_preferences(ufun)
+    return negotiator
 
 
 def is_local(host: str) -> bool:
@@ -162,10 +188,61 @@ async def neg_strategy(negid: str) -> NegStrategyModel | ResponseModel:
     return NegStrategyModel(negotiator=myinfo.negotiator, ufun=myinfo.ufun)
 
 
+@app.post("/init-negotiation")
+async def init_negotiation(req: NegotiationInfoModel) -> ResponseModel:
+    """Distributed mode: build and store the live negotiator for this process.
+
+    Called by the runner before the mechanism starts. The agent looks up its
+    *private* strategy + ufun for this negotiation and instantiates them here,
+    so they never leave this process.
+    """
+    if config is None:
+        return ResponseModel(
+            status=FAILURE,
+            message="Configuration not loaded. Please load the configuration first on /load-config.",
+        )
+    myinfo = sessions_accepted.get(req.negid, None) or config.negotiations.get(
+        req.info.name, None
+    )
+    if myinfo is None:
+        return ResponseModel(
+            status=FAILURE,
+            message=f"No accepted/known negotiation for {req.negid} ({req.info.name}).",
+        )
+    try:
+        live_negotiators[req.negid] = build_negotiator(myinfo)
+    except Exception as e:
+        return ResponseModel(status=FAILURE, message=str(e))
+    return ResponseModel(status=SUCCESS, message=f"Negotiator ready for {req.negid}")
+
+
+@app.post("/respond")
+async def respond(req: RespondRequest) -> dict:
+    """Distributed mode: run one round of the real negotiator on this process.
+
+    Receives a wire-encoded ``SAOState``, calls the live negotiator, and returns
+    a wire-encoded ``SAOResponse``.
+    """
+    negotiator = live_negotiators.get(req.negid, None)
+    if negotiator is None:
+        # Lazily build if /init-negotiation was skipped.
+        myinfo = sessions_accepted.get(req.negid, None)
+        if myinfo is None:
+            return ResponseModel(
+                status=FAILURE,
+                message=f"No live negotiator for {req.negid}. Call /init-negotiation first.",
+            ).model_dump()
+        negotiator = live_negotiators.setdefault(req.negid, build_negotiator(myinfo))
+    state = decode_state(req.state)
+    response = negotiator(state)
+    return encode_response(response)
+
+
 @app.post("/receive-results")
 async def receive_results(results: NegResultsModel) -> ResponseModel:
     info_accepted = sessions_accepted.pop(results.negid, None)
     info_started = sessions_started.pop(results.negid, None)
+    live_negotiators.pop(results.negid, None)
     info = info_accepted if info_accepted else info_started
     sessions_ended[results.negid] = SessionResultsDict(info=info, result=results)
     # remove from the active sessions

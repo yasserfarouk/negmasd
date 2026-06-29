@@ -3,6 +3,7 @@ from typing import TypedDict
 from yaml import safe_load
 from fastapi import FastAPI
 import asyncio
+import random
 from negmas import TraceElement
 from rich import print
 from random import shuffle
@@ -16,6 +17,7 @@ from negmasd.models import (
     NegotiationModel,
     ResponseModel,
 )
+from negmasd.negotiator import SAORemoteNegotiator
 from negmasd.common import FAILURE, SUCCESS, get_response, RUNNER_DEFAULT_PORT
 
 app = FastAPI()
@@ -39,17 +41,31 @@ class DParamsType(TypedDict):
     remove_type_field: bool
 
 
-async def async_run(
-    neg: NegotiationInfoModel, strategies: list[NegStrategyModel]
-) -> None:
-    print("Running negotiation:")
-    print(neg)
-    print(strategies)
+def build_mechanism(neg: NegotiationInfoModel) -> Mechanism:
     os = neg.info.outcome_space.make_object()
     m = neg.info.mechanism.make_object(outcome_space=os)
     assert isinstance(m, Mechanism), (
         f"Mechanism type is not valid: {type(m)}\n{neg.info.mechanism}"
     )
+    return m
+
+
+async def add_centralized_negotiators(m: Mechanism, neg: NegotiationInfoModel) -> None:
+    """Pull each partner's strategy + ufun and build them in the runner process."""
+    os = m.outcome_space
+    strategies: list[NegStrategyModel] = []
+    for partner in neg.info.partners:
+        strategy = await get_response(
+            f"http://{partner.host}:{partner.port}/neg-strategy",
+            dict(negid=neg.negid),
+            response_type=NegStrategyModel,
+            method="get",
+        )
+        if not isinstance(strategy, NegStrategyModel):
+            raise ValueError(
+                f"Partner {partner} did not return valid strategy info {strategy}"
+            )
+        strategies.append(strategy)
     if neg.info.random_order:
         shuffle(strategies)
     for s in strategies:
@@ -61,7 +77,50 @@ async def async_run(
         )
         m.add(negotiator, preferences=ufun)
 
-    m.run()
+
+async def add_distributed_negotiators(m: Mechanism, neg: NegotiationInfoModel) -> None:
+    """Add one remote proxy per partner; each forwards rounds to its process.
+
+    The partner's real strategy + ufun never leave its process. The proxy holds
+    no ufun: we only need the per-round response over the wire.
+    """
+    partners = list(neg.info.partners)
+    if neg.info.random_order:
+        shuffle(partners)
+    for partner in partners:
+        # Ask the partner to build and hold its live negotiator.
+        resp = await get_response(
+            f"http://{partner.host}:{partner.port}/init-negotiation",
+            neg,
+            response_type=ResponseModel,
+        )
+        if isinstance(resp, ResponseModel) and resp.status != SUCCESS:
+            raise ValueError(f"Partner {partner.name} failed to init: {resp.message}")
+        m.add(
+            SAORemoteNegotiator(
+                base_url=f"http://{partner.host}:{partner.port}",
+                negid=neg.negid,
+                partner_name=partner.name,
+                name=partner.name,
+            )
+        )
+
+
+async def async_run(neg: NegotiationInfoModel) -> None:
+    print(f"Running negotiation ({neg.info.mode} mode):")
+    print(neg)
+    m = build_mechanism(neg)
+    if neg.info.mode == "distributed":
+        await add_distributed_negotiators(m, neg)
+    else:
+        await add_centralized_negotiators(m, neg)
+
+    if neg.info.seed is not None:
+        # Bit-exact reproducibility (e.g. random first-proposer selection).
+        random.seed(neg.info.seed)
+    # The mechanism run loop is synchronous and, in distributed mode, makes
+    # blocking HTTP calls per round; keep it off the event loop.
+    await asyncio.to_thread(m.run)
     print(m.state)
     log_entry = dict(
         negid=neg.negid,
@@ -105,25 +164,10 @@ async def load_config(path: str) -> ResponseModel:
 
 @app.post("/run-negotiation")
 async def run_negotiation(neg: NegotiationInfoModel) -> ResponseModel:
-    strategies: list[NegStrategyModel] = []
-    for partner in neg.info.partners:
-        strategy = await get_response(
-            f"http://{partner.host}:{partner.port}/neg-strategy",
-            dict(negid=neg.negid),
-            response_type=NegStrategyModel,
-            method="get",
-        )
-        if not isinstance(strategy, NegStrategyModel):
-            return ResponseModel(
-                status=FAILURE,
-                message=f"Partner {partner} did not return valid strategy info {strategy}",
-            )
-        strategies.append(strategy)
-    asyncio.create_task(async_run(neg, strategies))
-
+    asyncio.create_task(async_run(neg))
     return ResponseModel(
         status=SUCCESS,
-        message=f"Running negotiation {neg.negid}",
+        message=f"Running negotiation {neg.negid} ({neg.info.mode} mode)",
     )
 
 

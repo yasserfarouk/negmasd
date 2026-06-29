@@ -1,6 +1,8 @@
-# A simple wrapper around negmas
-This repo provides a simple wrapper for running negotiations between agents on different processes/machines.
+# negmasd
 
+Run any [negmas](https://github.com/yasserfarouk/negmas) negotiation **distributedly** — each negotiator (and, optionally, each utility function) in its own process or machine — while reaching **bit-exact parity** with an ordinary in-process negmas run.
+
+negmasd reuses negmas's own `SAOMechanism`; it does not reimplement the protocol. The runner runs the real mechanism and forwards only the per-round decisions to the processes that own them. Only **values** cross the wire (plain JSON, never pickled objects), so the pieces can run under different Python versions or on different machines.
 
 ## Installation
 
@@ -10,49 +12,55 @@ After installing [uv](https://docs.astral.sh/uv/), clone this repo then:
 uv sync
 ```
 
-## Introduction
+## The three roles
 
-The main implementation files are the following:
+- **Agent** (`negmasd.agent`) — one per negotiator; holds that party's private strategy + ufun.
+- **Runner** (`negmasd.runner`) — runs the real `SAOMechanism`; one shared service.
+- **ufun service** (`negmasd.ufun_service`) — *(optional)* holds a ufun and evaluates outcomes for a `RemoteUtilityFunction`.
 
-- `agent.py` Implements an agent that can engage in negotiation
-- `runner.py` Implements a service that can run a negotiation locally based on information provided by agents and log/report results.
-- `cli.py` Implements a simple CLI to start agents; runners and apps
+An *app* is a folder of configs (`runner.yml` + `agents/*.yml`). See `src/negmasd/apps/procurement` for an example.
 
-An app is defined by a set of agent configs and (optionally) a runner config. For an example, see `src/negamasd/procurement`
+## Two execution modes
 
-You can see the available functionality of the CLI using:
+Each negotiation declares a `mode` (default `distributed`):
 
-```bash
-negmasd --help
+| Mode | What runs where |
+|------|-----------------|
+| **`centralized`** | the runner pulls each party's strategy + ufun and runs the whole negotiation locally |
+| **`distributed`** | the runner runs the mechanism but forwards every per-round `negotiator(state)` to the party's own process — strategy + ufun never leave it |
 
-```
+Both reach exact parity with negmas-proper for `n_steps`-bounded negotiations.
 
-
-
-## Simple Scenario
-You can try a simple scenario using:
+## Quick try
 
 ```bash
 negmasd builtin procurement
 ```
 
-This will start the following FastAPI processes:
+This starts a runner (9010), a buyer (8001) and a seller (8002) and loads their configs. Open <http://127.0.0.1:8001/docs>, call `/start-negotiation` with `neg = trade`, then `/peak` (on the buyer or the runner at <http://127.0.0.1:9010/docs>) to see the result.
 
-1. runner at port 9010
-1. buyer at port 8001
-1. seller at port 8002
+See the full CLI with:
 
-It should also call `/load-config` for all of them to load the corresponding configuration file from  `src/negamasd/procurement`.
+```bash
+negmasd --help
+```
 
-You can then navigate to [http://127.0.0.1:8001/docs](http://127.0.0.1:8001/docs)
+## Tests
 
-You can then use this docs interface to run `/start-negotiation` giving it the value `trade` for the `neg` parameter.
+negmasd is validated by **exact parity** against plain negmas: the same scenario, run distributedly, reaches the same agreement, step and timeout flag.
 
-This will start a negotiation. Upon completion the results of the negotiation will be available to the seller, the buyer and the runner.
+```bash
+uv run pytest                 # everything (includes real-subprocess HTTP tests)
+uv run pytest -m "not slow"   # skip the subprocess tests
+```
 
-You can check that by running `/peak` from the same page which will show you the internal memory of the buyer including the result of this negotiation.
+## Documentation
 
-You can then navigate to [http://127.0.0.1:9010/docs](http://127.0.0.1:9010/docs) and run `/peak` to see the complete history of this negotiation among other data.
+Full docs (Material for MkDocs):
 
+```bash
+uv run mkdocs serve           # live preview at http://127.0.0.1:8000
+uv run mkdocs build           # static site in ./site
+```
 
-
+Start with `docs/index.md`, then **Architecture**, **Execution modes**, and **Exact parity**.

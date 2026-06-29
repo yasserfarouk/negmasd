@@ -29,5 +29,17 @@ negmasd = "negmasd:cli.app"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[dependency-groups]
+dev = [
+    "mkdocs-material>=9.7.6",
+    "mkdocstrings-python>=2.0.5",
+]
+
 [tool.setuptools.package-data]
 "*" = ["src/nemasd/apps/**/*", "src/nemasd/apps/**/*.yaml", "src/nemasd/apps/**/*.yml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: tests that launch real subprocesses and communicate over HTTP",
+]

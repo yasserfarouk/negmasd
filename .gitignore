@@ -381,3 +381,6 @@ wheels/
 wheels/
 wiley-report.html
 wily-report.html
+
+# mkdocs build output
+site/

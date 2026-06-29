@@ -12,29 +12,43 @@ from negmasd.common import (
     RUNNER_DEFAULT_PORT,
     AGENT_BASE_PORT,
 )
-from negmasd.models import ResponseModel, StrModel
+from negmasd.models import ResponseModel
 
 app = typer.Typer()
 
 
+def _load_config_after_start(url: str, config: Path, delay: float = 2.0) -> None:
+    """Poll-load a config once the server is up (runs in a background thread)."""
+    sleep(delay)
+    import requests
+
+    for _ in range(30):
+        try:
+            resp = requests.get(f"{url}/load-config", params={"path": str(config)})
+            print(resp.json())
+            return
+        except Exception:
+            sleep(0.5)
+    print(f"Could not load config {config} into {url}")
+
+
 @app.command()
-def agent(port: int, config: Path, host="127.0.0.1"):
+def agent(port: int, config: Path | None = None, host: str = "127.0.0.1"):
     """
-    Start the agent server.
+    Start the agent server. If a config is given it is loaded automatically once
+    the server is ready; otherwise load it later via GET /load-config?path=...
     """
     print(f"running agent server on port {port} with config from {config}")
-    base = "negmasd.agent:app"
-    uvicorn.run(base, host="0.0.0.0", port=port)
-    sleep(2)
-    loop = asyncio.get_event_loop()
-    resp = loop.run_until_complete(
-        get_response(
-            f"http://{host}:{port}/load-config",
-            data=StrModel(value=str(config)),
-            response_type=ResponseModel,
-        )
-    )
-    print(resp)
+    if config is not None:
+        # uvicorn.run blocks, so load the config from a background thread.
+        import threading
+
+        threading.Thread(
+            target=_load_config_after_start,
+            args=(f"http://{host}:{port}", config),
+            daemon=True,
+        ).start()
+    uvicorn.run("negmasd.agent:app", host="0.0.0.0", port=port)
 
 
 @app.command()
@@ -45,6 +59,20 @@ def runner(port: int = RUNNER_DEFAULT_PORT):
     print(f"running runner server on port {port}")
     base = "negmasd.runner:app"
     uvicorn.run(base, host="0.0.0.0", port=port)
+
+
+@app.command()
+def ufun(port: int, config: Path | None = None, host: str = "127.0.0.1"):
+    """
+    Start a utility-function service. Negotiators can point a
+    `negmasd.ufuns.RemoteUtilityFunction` at it so the ufun runs in its own
+    process/machine. Optionally pass a config (YAML mapping ufun_id -> ufun
+    model) to preload ufuns.
+    """
+    print(f"running ufun service on port {port}")
+    if config is not None:
+        print(f"(load it after startup: GET http://{host}:{port}/load-config?path={config})")
+    uvicorn.run("negmasd.ufun_service:app", host="0.0.0.0", port=port)
 
 
 @app.command()
