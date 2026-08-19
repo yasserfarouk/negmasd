@@ -19,6 +19,13 @@ dependencies = [
     "uvicorn>=0.34.3",
 ]
 
+# gRPC is deliberately OPTIONAL: grpcio is a compiled wheel that fails to
+# install on some Python builds. Nothing on the HTTP path imports it, so
+# `uv sync` alone yields a fully working installation.
+#   uv sync --extra grpc
+[project.optional-dependencies]
+grpc = ["grpcio>=1.60"]
+
 [tool.uv.sources]
 negmas = { path = "../negmas", editable = true }
 
@@ -33,6 +40,8 @@ build-backend = "hatchling.build"
 dev = [
     "mkdocs-material>=9.7.6",
     "mkdocstrings-python>=2.0.5",
+    # Only needed to regenerate the checked-in protobuf stubs, never at runtime.
+    "grpcio-tools>=1.60",
 ]
 
 [tool.setuptools.package-data]
@@ -42,4 +51,5 @@ dev = [
 testpaths = ["tests"]
 markers = [
     "slow: tests that launch real subprocesses and communicate over HTTP",
+    "grpc: tests that need the optional grpcio extra",
 ]

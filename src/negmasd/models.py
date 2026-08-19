@@ -1,12 +1,24 @@
 from negmas import BaseUtilityFunction, Mechanism, Negotiator, OutcomeSpace
 from pydantic import BaseModel, Field
-from .constants import RUNNER_DEFAULT_PORT
+from .constants import DEFAULT_PROTOCOL, RUNNER_DEFAULT_PORT
+from .transport import Address
 
 
 class PartnerModel(BaseModel):
     name: str = Field(description="Name of the partner")
     host: str = Field(default="127.0.0.1", description="Host of the partner")
     port: int = Field(default=0, description="Port of the partner")
+    protocol: str = Field(
+        default=DEFAULT_PROTOCOL,
+        description=(
+            "Transport protocol to use when calling this partner ('http' or,"
+            " with the optional grpcio extra installed, 'grpc')."
+        ),
+    )
+
+    @property
+    def address(self) -> Address:
+        return Address(host=self.host, port=self.port, protocol=self.protocol)
 
 
 class StrModel(BaseModel):
@@ -163,10 +175,28 @@ class AgentConfigModel(BaseModel):
         default=RUNNER_DEFAULT_PORT,
         description="Role of the agent in the negotiation process",
     )
+    protocol: str = Field(
+        default=DEFAULT_PROTOCOL,
+        description="Transport protocol this agent itself serves on",
+    )
+    runner_protocol: str = Field(
+        default=DEFAULT_PROTOCOL,
+        description="Transport protocol to use when calling the runner",
+    )
     negotiations: dict[str, PersonalNegotiationModel] = Field(
         default_factory=dict,
         description="Map of names to  negotiation models that the agent is involved in",
     )
+
+    @property
+    def address(self) -> Address:
+        return Address(host=self.host, port=self.port, protocol=self.protocol)
+
+    @property
+    def runner_address(self) -> Address:
+        return Address(
+            host=self.runner_host, port=self.runner_port, protocol=self.runner_protocol
+        )
 
 
 class ResponseModel(BaseModel):
@@ -230,3 +260,21 @@ class RespondRequest(BaseModel):
 
     negid: str = Field(description="Unique identifier for the negotiation")
     state: dict = Field(description="Wire-encoded SAOState for the current round")
+
+
+# --------------------------------------------------------------------------- #
+# Request models for endpoints that historically took bare query parameters.
+# The method table needs one model per method so that every transport can
+# validate a payload the same way; the FastAPI adapter binds these as query
+# params, preserving the original `?path=`, `?neg=`, `?negid=` URLs.
+# --------------------------------------------------------------------------- #
+class PathRequest(BaseModel):
+    path: str = Field(description="Filesystem path of the configuration file")
+
+
+class StartNegotiationRequest(BaseModel):
+    neg: str = Field(description="Name of the negotiation to start")
+
+
+class NegIdRequest(BaseModel):
+    negid: str = Field(description="Unique identifier for the negotiation")

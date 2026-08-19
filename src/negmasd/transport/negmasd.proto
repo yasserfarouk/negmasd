@@ -1,0 +1,36 @@
+// The gRPC wire for negmasd.
+//
+// Deliberately ONE generic RPC carrying JSON, not a typed message per endpoint.
+// Two reasons, both structural rather than stylistic:
+//
+//   1. negmasd's config models (OutcomeSpaceModel, NegotiatorModel,
+//      MechanismModel, UtilityFunctionModel) set pydantic `extra = "allow"` so
+//      that arbitrary negmas constructor kwargs ride along into
+//      `MakableModel.make_object`. An open-ended kwargs bag is not expressible
+//      as a fixed protobuf message.
+//   2. The project guarantees the wire is "plain JSON of values" so that agents
+//      may run different Python versions on different machines. Typed messages
+//      would make the schema a build artifact both ends must share.
+//
+// `negmasd.wire` remains the explicit schema for the one hot payload
+// (SAOState / SAOResponse); this envelope just moves bytes.
+
+syntax = "proto3";
+
+package negmasd;
+
+service Negmasd {
+  // `method` names an entry in the service's method table ("respond",
+  // "accept-negotiation", ...); `payload` is that method's JSON request object.
+  rpc Call (CallRequest) returns (CallReply);
+}
+
+message CallRequest {
+  string method = 1;
+  string payload = 2;  // JSON object
+}
+
+message CallReply {
+  string payload = 1;  // JSON value
+  string error = 2;    // non-empty if the call failed server-side
+}
