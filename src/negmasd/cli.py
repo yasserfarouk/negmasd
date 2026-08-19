@@ -21,9 +21,20 @@ from negmasd.transport import Address, TransportError, channel_for, serve_servic
 app = typer.Typer()
 
 PROTOCOL_HELP = (
-    "Transport protocol to serve on: 'http' (FastAPI/uvicorn) or 'grpc'"
-    " (requires the optional grpcio extra: uv sync --extra grpc)."
+    "Transport protocol to serve on: 'http' (FastAPI/uvicorn), 'grpc'"
+    " (optional extra: uv sync --extra grpc) or 'mqtt' (optional extra:"
+    " uv sync --extra mqtt; see --broker)."
 )
+BROKER_HELP = (
+    "MQTT broker as host[:port] (default 127.0.0.1:1883, or the"
+    " NEGMASD_MQTT_BROKER environment variable). Ignored for other protocols."
+)
+IDENTITY_HOST_HELP = (
+    "This service's own host as its peers have it configured. Used to build the"
+    " MQTT topic (negmasd/<host>_<port>/rpc); it must match the partner entries"
+    " that name this service. Not a bind address."
+)
+MQTT = "mqtt"
 
 
 def _load_config_after_start(
@@ -35,28 +46,61 @@ def _load_config_after_start(
     """
     sleep(delay)
     channel = channel_for(address)
-    for _ in range(30):
-        try:
-            print(channel.call("load-config", {"path": str(config)}, http_method="get"))
-            return
-        except Exception:
-            sleep(0.5)
+    # Short per-attempt timeout, then retry: over MQTT a request published before
+    # the server has subscribed is silently dropped by the broker, so one long
+    # attempt would simply block instead of retrying.
+    original, channel.timeout = channel.timeout, 3.0
+    try:
+        for _ in range(30):
+            try:
+                print(
+                    channel.call(
+                        "load-config", {"path": str(config)}, http_method="get"
+                    )
+                )
+                return
+            except Exception:
+                sleep(0.5)
+    finally:
+        channel.timeout = original
     print(f"Could not load config {config} into {address}")
 
 
+def _apply_broker(protocol: str, broker: str | None) -> None:
+    """Point this process at an MQTT broker, if MQTT is in play."""
+    if protocol != MQTT or not broker:
+        return
+    from negmasd.transport.mqtt import parse_broker, set_broker
+
+    set_broker(*parse_broker(broker))
+
+
 def _serve(
-    module: str, port: int, protocol: str, host: str = "0.0.0.0", **kwargs
+    module: str,
+    port: int,
+    protocol: str,
+    host: str = "0.0.0.0",
+    identity_host: str = "127.0.0.1",
+    broker: str | None = None,
+    **kwargs,
 ) -> None:
     """Serve one role over ``protocol``.
 
     For HTTP the uvicorn import string is passed through unchanged, preserving
-    the previous startup behaviour exactly.
+    the previous startup behaviour exactly. ``host`` stays the bind address (0.0.0.0
+    for the socket transports); ``identity_host`` is only the MQTT topic identity,
+    so adding MQTT cannot change which interfaces HTTP/gRPC listen on.
     """
     from importlib import import_module
 
+    _apply_broker(protocol, broker)
     service = import_module(f"negmasd.{module}").service
     if protocol == DEFAULT_PROTOCOL:
         kwargs["app_path"] = f"negmasd.{module}:app"
+    if protocol == MQTT:
+        from negmasd.transport.mqtt import node_id
+
+        kwargs["node"] = node_id(identity_host, port)
     try:
         serve_service(service, host=host, port=port, protocol=protocol, **kwargs)
     except TransportError as e:
@@ -66,9 +110,19 @@ def _serve(
         raise typer.Exit(code=1) from None
 
 
-def _autoload(module: str, port: int, host: str, protocol: str, config: Path) -> None:
+def _autoload(
+    module: str,
+    port: int,
+    host: str,
+    protocol: str,
+    config: Path,
+    broker: str | None = None,
+) -> None:
     """Serving blocks, so load the config from a background thread."""
     import threading
+
+    # The loader talks to ourselves over the same protocol, so it needs the broker.
+    _apply_broker(protocol, broker)
 
     threading.Thread(
         target=_load_config_after_start,
@@ -83,6 +137,7 @@ def agent(
     config: Path | None = None,
     host: str = "127.0.0.1",
     protocol: str = typer.Option(DEFAULT_PROTOCOL, help=PROTOCOL_HELP),
+    broker: str | None = typer.Option(None, help=BROKER_HELP),
 ):
     """
     Start the agent server. If a config is given it is loaded automatically once
@@ -90,20 +145,22 @@ def agent(
     """
     print(f"running {protocol} agent server on port {port} with config from {config}")
     if config is not None:
-        _autoload("agent", port, host, protocol, config)
-    _serve("agent", port, protocol)
+        _autoload("agent", port, host, protocol, config, broker)
+    _serve("agent", port, protocol, identity_host=host, broker=broker)
 
 
 @app.command()
 def runner(
     port: int = RUNNER_DEFAULT_PORT,
     protocol: str = typer.Option(DEFAULT_PROTOCOL, help=PROTOCOL_HELP),
+    host: str = typer.Option("127.0.0.1", help=IDENTITY_HOST_HELP),
+    broker: str | None = typer.Option(None, help=BROKER_HELP),
 ):
     """
     Start the session runner server. You must have one of these running.
     """
     print(f"running {protocol} runner server on port {port}")
-    _serve("runner", port, protocol)
+    _serve("runner", port, protocol, identity_host=host, broker=broker)
 
 
 @app.command()
@@ -112,6 +169,7 @@ def ufun(
     config: Path | None = None,
     host: str = "127.0.0.1",
     protocol: str = typer.Option(DEFAULT_PROTOCOL, help=PROTOCOL_HELP),
+    broker: str | None = typer.Option(None, help=BROKER_HELP),
 ):
     """
     Start a utility-function service. Negotiators can point a
@@ -121,8 +179,8 @@ def ufun(
     """
     print(f"running {protocol} ufun service on port {port}")
     if config is not None:
-        _autoload("ufun_service", port, host, protocol, config)
-    _serve("ufun_service", port, protocol)
+        _autoload("ufun_service", port, host, protocol, config, broker)
+    _serve("ufun_service", port, protocol, identity_host=host, broker=broker)
 
 
 @app.command()
@@ -145,6 +203,19 @@ def builtin(
     Pass --runner-port=0 to use an already-running runner instead of starting one.
     """
     print(f"running builtin app {app} over {protocol}")
+    if protocol == MQTT:
+        # builtin is built around allocating and substituting real ports, which
+        # MQTT has none of -- under MQTT host:port is a topic identifier and the
+        # only real endpoint is the broker.
+        print(
+            "[red]builtin does not support --protocol mqtt: its whole job is"
+            " allocating real ports, and MQTT has none (host:port is a topic"
+            " identifier there). Start the roles individually instead:\n"
+            "  negmasd runner --port 9010 --protocol mqtt --broker HOST:PORT\n"
+            "  negmasd agent 8001 --config buyer.yml --protocol mqtt --broker"
+            " HOST:PORT[/red]"
+        )
+        raise typer.Exit(code=1)
     # Default SIGTERM handling exits without unwinding, which would orphan the
     # child servers and leave the generated config dir behind. Turn it into a
     # normal exit so the `finally` below actually runs.

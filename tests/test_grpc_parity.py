@@ -20,161 +20,38 @@ on a plain ``uv sync``.
 
 from __future__ import annotations
 
-import json
-import random
-import socket
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 import pytest
 import yaml
 
-from negmas.gb.negotiators.timebased import AspirationNegotiator
-from negmas.preferences.generators import generate_multi_issue_ufuns
-from negmas.sao import SAOMechanism
 from negmas.serialization import serialize
 
 from negmasd.agent import AgentService
 from negmasd.runner import RunnerService
-from negmasd.transport import Address, channel_for, close_all_channels
+from negmasd.transport import Address, channel_for
+
+from transport_harness import (
+    N_STEPS,
+    addr as _harness_addr,
+    drive_negotiation,
+    free_port,
+    make_ufuns,
+    plain,
+    run_negmas,
+    wait_ready,
+    write_configs,
+)
 
 grpc = pytest.importorskip("grpc", reason="needs the optional grpcio extra")
 
-SEED_RUN = 0xC0FFEE
-ASPIRATION = "negmas.gb.negotiators.timebased.AspirationNegotiator"
+PROTOCOL = "grpc"
 
 
-# --------------------------------------------------------------------------- #
-# helpers
-# --------------------------------------------------------------------------- #
-def _free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
-
-
-def _plain(obj):
-    """Coerce a serialized (possibly numpy-laden) structure to plain JSON types."""
-    return json.loads(json.dumps(obj, default=float))
-
-
-def _make_ufuns(scenario: str):
-    random.seed(7)
-    ufuns = generate_multi_issue_ufuns(n_issues=2, n_values=5, n_ufuns=2, numeric=False)
-    if scenario == "timeout":
-        # No mutually acceptable outcome -> must time out with no agreement.
-        for u in ufuns:
-            u.reserved_value = 0.999
-    return ufuns
-
-
-def _run_negmas(ufuns, n_steps: int) -> dict:
-    os = ufuns[0].outcome_space
-    m = SAOMechanism(outcome_space=os, n_steps=n_steps)
-    for u in ufuns:
-        m.add(AspirationNegotiator(), preferences=u)
-    random.seed(SEED_RUN)
-    m.run()
-    return dict(
-        agreement=None if m.agreement is None else list(m.agreement),
-        step=int(m.state.step),
-        timedout=bool(m.state.timedout),
-    )
-
-
-def _write_configs(
-    tmp: Path, ufuns, n_steps: int, mode: str, ports: dict, protocol: str
-) -> dict:
-    """Same shape as the HTTP full-stack configs, but naming a protocol."""
-    os_ser = _plain(serialize(ufuns[0].outcome_space, python_class_identifier="type"))
-    mechanism = {"type": "negmas.sao.mechanism.SAOMechanism", "n_steps": n_steps}
-    partners = [
-        {
-            "name": f"P{i}",
-            "host": "127.0.0.1",
-            "port": ports["agents"][i],
-            "protocol": protocol,
-        }
-        for i in range(len(ufuns))
-    ]
-    runner_path = tmp / "runner.yml"
-    runner_path.write_text(
-        yaml.safe_dump({"name": "runner", "port": ports["runner"], "keep_trace": True})
-    )
-
-    agent_paths = []
-    for i, u in enumerate(ufuns):
-        negotiation = {
-            "name": "parity",
-            "partners": partners,
-            "outcome_space": os_ser,
-            "mechanism": mechanism,
-            "mode": mode,
-            "seed": SEED_RUN,
-            "negotiator": {"type": ASPIRATION, "name": f"P{i}"},
-            "ufun": _plain(serialize(u, python_class_identifier="type")),
-        }
-        agent_cfg = {
-            "name": f"P{i}",
-            "host": "127.0.0.1",
-            "port": ports["agents"][i],
-            "protocol": protocol,
-            "runner_host": "127.0.0.1",
-            "runner_port": ports["runner"],
-            "runner_protocol": protocol,
-            "negotiations": {"parity": negotiation},
-        }
-        p = tmp / f"agent{i}.yml"
-        p.write_text(yaml.safe_dump(agent_cfg))
-        agent_paths.append(p)
-    return {"runner": runner_path, "agents": agent_paths}
-
-
-def _addr(port: int, protocol: str = "grpc") -> Address:
-    return Address(host="127.0.0.1", port=port, protocol=protocol)
-
-
-def _drive_negotiation(ports: dict, cfgs: dict, protocol: str = "grpc") -> dict:
-    """Load configs, start the negotiation, and poll the runner for its result."""
-    runner = channel_for(_addr(ports["runner"], protocol))
-    agents = [channel_for(_addr(p, protocol)) for p in ports["agents"]]
-
-    resp = runner.call(
-        "load-config", {"path": str(cfgs["runner"])}, http_method="get"
-    )
-    assert resp["status"] == "success", resp
-    for channel, path in zip(agents, cfgs["agents"]):
-        resp = channel.call("load-config", {"path": str(path)}, http_method="get")
-        assert resp["status"] == "success", resp
-
-    # Initiator (P0) starts the negotiation.
-    resp = agents[0].call("start-negotiation", {"neg": "parity"}, http_method="get")
-    assert resp["status"] == "success", resp
-
-    result = None
-    deadline = time.time() + 60
-    while time.time() < deadline:
-        sessions = runner.call("peak", {}, http_method="get")["sessions"]
-        if sessions:
-            result = next(iter(sessions.values()))
-            break
-        time.sleep(0.1)
-    assert result is not None, "runner produced no result"
-    return dict(
-        agreement=None if result["agreement"] is None else list(result["agreement"]),
-        step=int(result["final_state"]["step"]),
-        timedout=bool(result["final_state"]["timedout"]),
-    )
-
-
-@pytest.fixture
-def clean_channels():
-    """Channels are cached per address; don't leak them between tests."""
-    close_all_channels()
-    yield
-    close_all_channels()
+def _addr(port: int, protocol: str = PROTOCOL) -> Address:
+    return _harness_addr(port, protocol)
 
 
 # --------------------------------------------------------------------------- #
@@ -222,8 +99,8 @@ def test_http_and_grpc_expose_the_same_methods(factory):
 def test_full_stack_parity_over_grpc(tmp_path, mode, scenario, clean_channels):
     from negmasd.transport.grpc import GrpcServerHandle
 
-    ufuns = _make_ufuns(scenario)
-    ref = _run_negmas(ufuns, n_steps=25)
+    ufuns = make_ufuns(scenario)
+    ref = run_negmas(ufuns)
     if scenario == "timeout":
         assert ref["agreement"] is None and ref["timedout"], ref
 
@@ -236,8 +113,8 @@ def test_full_stack_parity_over_grpc(tmp_path, mode, scenario, clean_channels):
     try:
         bound = [h.start() for h in handles]
         ports = {"runner": bound[0], "agents": bound[1:]}
-        cfgs = _write_configs(tmp_path, ufuns, 25, mode, ports, "grpc")
-        got = _drive_negotiation(ports, cfgs)
+        cfgs = write_configs(tmp_path, ufuns, mode, ports, PROTOCOL)
+        got = drive_negotiation(ports, cfgs, PROTOCOL)
         assert got == ref, f"grpc/{mode}/{scenario}: {got} != negmas {ref}"
     finally:
         for h in handles:
@@ -250,16 +127,16 @@ def test_grpc_and_http_agree_exactly(tmp_path, clean_channels):
     protocols, one assertion."""
     from negmasd.transport.grpc import GrpcServerHandle
 
-    ufuns = _make_ufuns("deal")
-    ref = _run_negmas(ufuns, n_steps=25)
+    ufuns = make_ufuns("deal")
+    ref = run_negmas(ufuns)
 
     services = [RunnerService(), AgentService(), AgentService()]
     handles = [GrpcServerHandle(s, host="127.0.0.1", port=0) for s in services]
     try:
         bound = [h.start() for h in handles]
         ports = {"runner": bound[0], "agents": bound[1:]}
-        cfgs = _write_configs(tmp_path, ufuns, 25, "distributed", ports, "grpc")
-        over_grpc = _drive_negotiation(ports, cfgs)
+        cfgs = write_configs(tmp_path, ufuns, "distributed", ports, PROTOCOL)
+        over_grpc = drive_negotiation(ports, cfgs, PROTOCOL)
     finally:
         for h in handles:
             h.stop(grace=0)
@@ -269,20 +146,6 @@ def test_grpc_and_http_agree_exactly(tmp_path, clean_channels):
 # --------------------------------------------------------------------------- #
 # full-stack parity over gRPC, in real subprocesses, driven by the CLI
 # --------------------------------------------------------------------------- #
-def _wait_ready(port: int, timeout: float = 30.0) -> None:
-    channel = channel_for(_addr(port))
-    deadline = time.time() + timeout
-    last = None
-    while time.time() < deadline:
-        try:
-            if channel.call("root", {}, http_method="get"):
-                return
-        except Exception as e:  # server not up yet
-            last = e
-            time.sleep(0.2)
-    raise RuntimeError(f"grpc service on {port} did not become ready: {last}")
-
-
 @pytest.mark.slow
 @pytest.mark.grpc
 @pytest.mark.parametrize("mode", ["centralized", "distributed"])
@@ -290,11 +153,11 @@ def test_full_stack_parity_over_grpc_subprocesses(tmp_path, mode, clean_channels
     """The real deployment path: `negmasd <role> --protocol grpc` in its own OS
     process, so the CLI, the lazy transport resolution and the server all run
     exactly as a user would run them."""
-    ufuns = _make_ufuns("deal")
-    ref = _run_negmas(ufuns, n_steps=25)
+    ufuns = make_ufuns("deal")
+    ref = run_negmas(ufuns)
 
-    ports = {"runner": _free_port(), "agents": [_free_port(), _free_port()]}
-    cfgs = _write_configs(tmp_path, ufuns, 25, mode, ports, "grpc")
+    ports = {"runner": free_port(), "agents": [free_port(), free_port()]}
+    cfgs = write_configs(tmp_path, ufuns, mode, ports, PROTOCOL)
 
     exe = Path(sys.executable).parent / "negmasd"
     procs = [
@@ -310,8 +173,8 @@ def test_full_stack_parity_over_grpc_subprocesses(tmp_path, mode, clean_channels
         )
     try:
         for port in [ports["runner"], *ports["agents"]]:
-            _wait_ready(port)
-        got = _drive_negotiation(ports, cfgs)
+            wait_ready(port, PROTOCOL)
+        got = drive_negotiation(ports, cfgs, PROTOCOL)
         assert got == ref, f"grpc subprocess/{mode}: {got} != negmas {ref}"
     finally:
         for p in procs:
@@ -333,12 +196,18 @@ def test_remote_ufun_over_grpc_exact_parity(tmp_path, clean_channels):
     Also the only end-to-end coverage of ``UfunService.load_config``: the ufun is
     serialized to YAML, loaded over the wire, and every ``eval`` is a real RPC.
     """
+    import random
+
+    from negmas.gb.negotiators.timebased import AspirationNegotiator
+    from negmas.sao import SAOMechanism
+
     from negmasd.transport.grpc import GrpcServerHandle
     from negmasd.ufun_service import UfunService
     from negmasd.ufuns import RemoteUtilityFunction
+    from transport_harness import SEED_RUN
 
-    ufuns = _make_ufuns("deal")
-    ref = _run_negmas(ufuns, n_steps=25)
+    ufuns = make_ufuns("deal")
+    ref = run_negmas(ufuns)
 
     # One ufun service per party, each holding only its owner's ufun.
     handles, remotes = [], []
@@ -347,7 +216,7 @@ def test_remote_ufun_over_grpc_exact_parity(tmp_path, clean_channels):
             cfg = tmp_path / f"ufun{i}.yml"
             cfg.write_text(
                 yaml.safe_dump(
-                    {"default": _plain(serialize(u, python_class_identifier="type"))}
+                    {"default": plain(serialize(u, python_class_identifier="type"))}
                 )
             )
             handle = GrpcServerHandle(UfunService(), host="127.0.0.1", port=0)
@@ -367,7 +236,7 @@ def test_remote_ufun_over_grpc_exact_parity(tmp_path, clean_channels):
         for remote, u in zip(remotes, ufuns):
             assert remote.reserved_value == pytest.approx(u.reserved_value)
 
-        m = SAOMechanism(outcome_space=ufuns[0].outcome_space, n_steps=25)
+        m = SAOMechanism(outcome_space=ufuns[0].outcome_space, n_steps=N_STEPS)
         for remote in remotes:
             m.add(AspirationNegotiator(), preferences=remote)
         random.seed(SEED_RUN)
@@ -420,13 +289,13 @@ def test_remote_ufun_is_addressable_from_config(tmp_path, clean_channels, style)
     from negmasd.transport.grpc import GrpcServerHandle
     from negmasd.ufun_service import UfunService
 
-    u = _make_ufuns("deal")[0]
+    u = make_ufuns("deal")[0]
     cfg = tmp_path / "ufuns.yml"
     cfg.write_text(
-        yaml.safe_dump({"default": _plain(serialize(u, python_class_identifier="type"))})
+        yaml.safe_dump({"default": plain(serialize(u, python_class_identifier="type"))})
     )
     os_model = OutcomeSpaceModel(
-        **_plain(serialize(u.outcome_space, python_class_identifier="type"))
+        **plain(serialize(u.outcome_space, python_class_identifier="type"))
     )
 
     handle = GrpcServerHandle(UfunService(), host="127.0.0.1", port=0)

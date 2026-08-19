@@ -5,10 +5,11 @@ declare a *method table*; each transport is an adapter that projects that table
 onto a wire protocol. Adding a protocol therefore never touches negotiation
 logic, and the protocols cannot drift apart because they read the same table.
 
-``http`` (FastAPI + httpx) is always available. ``grpc`` is **optional**: it is
-registered here only as a module-path string, so ``grpcio`` is imported the
-first moment a gRPC peer is actually addressed and never otherwise. Everything
-on the HTTP path works with ``grpcio`` absent.
+``http`` (FastAPI + httpx) is always available. ``grpc`` and ``mqtt`` are
+**optional**: each is registered here only as a module-path string, so ``grpcio``
+and ``paho-mqtt`` are imported the first moment a peer using that protocol is
+actually addressed, and never otherwise. Everything on the HTTP path works with
+both absent.
 """
 
 from .base import (
@@ -35,6 +36,12 @@ register_transport(
     "grpc", "negmasd.transport.grpc:GrpcChannel", install_hint=_GRPC_HINT
 )
 register_server("grpc", "negmasd.transport.grpc:serve_grpc", install_hint=_GRPC_HINT)
+
+_MQTT_HINT = "Install the optional extra with `uv sync --extra mqtt`."
+register_transport(
+    "mqtt", "negmasd.transport.mqtt:MqttChannel", install_hint=_MQTT_HINT
+)
+register_server("mqtt", "negmasd.transport.mqtt:serve_mqtt", install_hint=_MQTT_HINT)
 
 __all__ = [
     "Address",

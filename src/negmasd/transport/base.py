@@ -158,6 +158,12 @@ class Service(ABC):
 class Channel(ABC):
     """A connection to one peer service, usable from sync and async code."""
 
+    #: How long a single call may take. Part of the contract because callers
+    #: legitimately tighten it — readiness polling needs a short timeout with
+    #: retries (over MQTT a request published before the peer subscribes is
+    #: silently dropped, so one long call would just block).
+    timeout: float = 60.0
+
     @abstractmethod
     async def acall(
         self, method: str, payload: dict[str, Any], *, http_method: str = "post"

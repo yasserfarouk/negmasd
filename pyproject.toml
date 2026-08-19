@@ -25,6 +25,7 @@ dependencies = [
 #   uv sync --extra grpc
 [project.optional-dependencies]
 grpc = ["grpcio>=1.60"]
+mqtt = ["paho-mqtt>=2.0"]
 
 [tool.uv.sources]
 negmas = { path = "../negmas", editable = true }
@@ -42,6 +43,9 @@ dev = [
     "mkdocstrings-python>=2.0.5",
     # Only needed to regenerate the checked-in protobuf stubs, never at runtime.
     "grpcio-tools>=1.60",
+    # A pure-Python MQTT broker, so the MQTT tests can run against a real one
+    # without requiring mosquitto. Test-only; never imported by negmasd.
+    "amqtt>=0.11",
 ]
 
 [tool.setuptools.package-data]
@@ -52,4 +56,5 @@ testpaths = ["tests"]
 markers = [
     "slow: tests that launch real subprocesses and communicate over HTTP",
     "grpc: tests that need the optional grpcio extra",
+    "mqtt: tests that need the optional paho-mqtt extra and a broker",
 ]
