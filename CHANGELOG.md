@@ -7,6 +7,14 @@ the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Documentation
+
+- The **two execution modes** (`centralized` vs. `distributed`) are now the first
+  thing the README and the docs home page explain, each illustrated with a diagram
+  drawn to the same shape so the two real differences stand out: where each party's
+  strategy + ufun live, and setup-only vs. per-round traffic. *Execution modes* also
+  moved ahead of *Architecture* in the nav, and both pages carry the diagrams.
+
 ### Added
 
 - **Pluggable transports** (`negmasd.transport`). Each role is now a plain

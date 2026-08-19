@@ -59,8 +59,8 @@ plugins:
 nav:
   - Home: index.md
   - Quickstart: quickstart.md
-  - Architecture: architecture.md
   - Execution modes: modes.md
+  - Architecture: architecture.md
   - Configuration: configuration.md
   - CLI: cli.md
   - Exact parity: parity.md

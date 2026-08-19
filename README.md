@@ -2,9 +2,80 @@
 
 Run any [negmas](https://github.com/yasserfarouk/negmas) negotiation **distributedly** — each negotiator (and, optionally, each utility function) in its own process or machine — while reaching **bit-exact parity** with an ordinary in-process negmas run.
 
-negmasd reuses negmas's own `SAOMechanism`; it does not reimplement the protocol. The runner runs the real mechanism and forwards only the per-round decisions to the processes that own them. Only **values** cross the wire (plain JSON, never pickled objects), so the pieces can run under different Python versions or on different machines.
+negmasd reuses negmas's own `SAOMechanism`; it does not reimplement the protocol. Only **values** cross the wire (plain JSON, never pickled objects), so the pieces can run under different Python versions or on different machines.
 
 The wire is pluggable: **HTTP** (FastAPI) always, plus **gRPC** and **MQTT** as optional extras. The roles themselves contain no networking code — see [Transports](docs/transports.md).
+
+## The central distinction: two execution modes
+
+Every negotiation declares a `mode` (default `distributed`) — it is a property of
+the *negotiation*, not a server-wide switch, so one runner can serve both at once.
+
+In both modes the runner runs the real `SAOMechanism`. What differs is **where each
+party's strategy and ufun live**, and therefore **who computes each response**.
+
+### `centralized` — strategies move to the runner
+
+The runner pulls each party's strategy + ufun **once, at setup**, builds the
+negotiators in its own process, and runs the whole negotiation locally. No traffic
+during the negotiation; the runner sees everything.
+
+```mermaid
+flowchart LR
+    subgraph P0["Agent P0 process"]
+      C0["config:<br/>strategy + ufun"]
+    end
+    subgraph RUN["Runner process"]
+      RS["Runner service"]
+      M["SAOMechanism"]
+      M --- N0["real negotiator P0<br/>+ its ufun"]
+      M --- N1["real negotiator P1<br/>+ its ufun"]
+      RS -. builds .-> M
+    end
+    subgraph P1["Agent P1 process"]
+      C1["config:<br/>strategy + ufun"]
+    end
+    RS -. "neg-strategy: pulls strategy + ufun<br/>once, at setup" .-> C0
+    RS -. "neg-strategy: pulls strategy + ufun<br/>once, at setup" .-> C1
+```
+
+### `distributed` (default) — decisions move to the owners
+
+The runner runs the mechanism with one **proxy** negotiator per party — holding no
+ufun and no strategy — and forwards **every round** to the party's own process,
+where the real negotiator runs. Strategy and ufun never leave their owner.
+
+```mermaid
+flowchart LR
+    subgraph P0["Agent P0 process"]
+      N0["real negotiator P0<br/>+ its ufun"]
+    end
+    subgraph RUN["Runner process"]
+      RS["Runner service"]
+      M["SAOMechanism"]
+      M --- X0["proxy P0<br/>no ufun, no strategy"]
+      M --- X1["proxy P1<br/>no ufun, no strategy"]
+      RS -. builds .-> M
+    end
+    subgraph P1["Agent P1 process"]
+      N1["real negotiator P1<br/>+ its ufun"]
+    end
+    RS -. "init-negotiation<br/>once, at setup" .-> N0
+    RS -. "init-negotiation<br/>once, at setup" .-> N1
+    X0 -- "respond(state), every round" --> N0
+    X1 -- "respond(state), every round" --> N1
+```
+
+In both modes the runner delivers the final `receive-results` to every party when
+`mechanism.run()` returns, so that part of the picture is identical and is left out
+of both diagrams.
+
+The two diagrams are deliberately the same shape: read them for the two real
+differences — **where the ufun box sits**, and **once at setup vs. every round**.
+
+Both modes reach exact parity with negmas-proper for `n_steps`-bounded
+negotiations. Independently of the mode, a ufun can live in *yet another* process
+(`RemoteUtilityFunction`) — see [Execution modes](docs/modes.md).
 
 ## Installation
 
@@ -25,20 +96,9 @@ Neither `grpcio` nor `paho-mqtt` is ever required — everything works without t
 - **Runner** (`negmasd.runner`) — runs the real `SAOMechanism`; one shared service.
 - **ufun service** (`negmasd.ufun_service`) — *(optional)* holds a ufun and evaluates outcomes for a `RemoteUtilityFunction`.
 
-Each role is a plain Python service that declares a *method table*; a transport adapter projects it onto HTTP or gRPC, so negotiation logic never names a protocol.
+Each role is a plain Python service that declares a *method table*; a transport adapter projects it onto HTTP, gRPC or MQTT, so negotiation logic never names a protocol. The arrows in the diagrams above are method names, not URLs.
 
 An *app* is a folder of configs (`runner.yml` + `agents/*.yml`). See `src/negmasd/apps/procurement` for an example.
-
-## Two execution modes
-
-Each negotiation declares a `mode` (default `distributed`):
-
-| Mode | What runs where |
-|------|-----------------|
-| **`centralized`** | the runner pulls each party's strategy + ufun and runs the whole negotiation locally |
-| **`distributed`** | the runner runs the mechanism but forwards every per-round `negotiator(state)` to the party's own process — strategy + ufun never leave it |
-
-Both reach exact parity with negmas-proper for `n_steps`-bounded negotiations.
 
 ## Quick try
 

@@ -3,7 +3,11 @@
 negmasd has three process roles. Each is a plain Python **service** holding no
 transport code: it declares a *method table*, and a transport adapter projects
 that table onto a wire protocol — [FastAPI](https://fastapi.tiangolo.com/) over
-HTTP by default, or gRPC. See [Transports](transports.md).
+HTTP by default, or gRPC, or MQTT. See [Transports](transports.md).
+
+This page is the mechanics. For the distinction that shapes everything below —
+`centralized` vs. `distributed`, i.e. where each party's strategy and ufun live —
+start at [Execution modes](modes.md).
 
 | Role | Module | Holds | Responsibility |
 |------|--------|-------|----------------|
@@ -49,9 +53,12 @@ sequenceDiagram
 
 The **initiator** strips its private fields (`PersonalNegotiationModel.remove_personal_info()`) before sending the public `NegotiationModel` to partners and the runner. Private strategy + ufun never appear in the public payload.
 
-## Distributed execution
+## Inside distributed execution
 
-In distributed mode the runner builds the real `SAOMechanism` but adds one **`SAORemoteNegotiator`** per partner instead of the partner's real strategy. The proxy:
+[Execution modes](modes.md) covers *what* the two modes are; this section is *how*
+the distributed one is built. The runner builds the real `SAOMechanism` but adds one
+**`SAORemoteNegotiator`** per partner instead of the partner's real strategy. The
+proxy:
 
 - holds **no ufun and no strategy**,
 - on each `__call__(state)`, encodes the state, sends it to the partner's `respond` over that partner's protocol, and decodes the returned `SAOResponse`.

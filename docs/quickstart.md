@@ -67,7 +67,9 @@ negotiations:
     # ...
 ```
 
-The agreement is identical either way (see [Exact parity](parity.md)).
+The agreement is identical either way (see [Exact parity](parity.md)). The two
+modes are laid out side by side, with diagrams, under
+[Execution modes](modes.md).
 
 ## Run it over gRPC
 
