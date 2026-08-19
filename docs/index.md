@@ -14,7 +14,7 @@ A negotiation usually runs in one process: the mechanism, every negotiator, and 
 
 negmasd keeps each party's strategy and ufun in that party's own process. Only **values** cross the wire (plain JSON — never pickled objects), so the pieces can run anywhere.
 
-The wire itself is pluggable: HTTP (FastAPI) always, and **gRPC** as an optional extra. Roles are transport-agnostic, so the protocol is a deployment choice rather than a rewrite — see [Transports](transports.md).
+The wire itself is pluggable: HTTP (FastAPI) always, plus **gRPC** and **MQTT** as optional extras. Roles declare *what* they can do and adapters project that onto a protocol, so switching transport is a deployment choice rather than a rewrite — see [Transports](transports.md).
 
 ## The three roles
 
@@ -50,5 +50,5 @@ Both reach exact parity with negmas-proper. See [Execution modes](modes.md).
 - [Quickstart](quickstart.md) — run a negotiation in a few commands.
 - [Architecture](architecture.md) — how the handshake and the wire work.
 - [Exact parity](parity.md) — why it is exact, and the proven envelope.
-- [Transports](transports.md) — HTTP and gRPC, and how to add a protocol.
+- [Transports](transports.md) — the transport-independent design, HTTP/gRPC/MQTT, and how to add a protocol.
 - [Changelog](changelog.md) — what changed.

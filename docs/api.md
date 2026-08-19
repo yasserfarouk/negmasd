@@ -5,10 +5,11 @@ Served over HTTP, every role is a FastAPI app and exposes interactive docs at
 `/docs`. The endpoints below are what the roles call on each other; you normally
 only invoke `/load-config`, `/start-negotiation`, and `/peak` yourself.
 
-Over [gRPC](transports.md) the same methods are reached through one generic
-`Call` RPC whose `method` field is the path without its leading slash
-(`respond`, `accept-negotiation`, …) and whose payload is the same JSON. There is
-no GET/POST distinction there, so the `Method` column below is HTTP-only.
+Over [gRPC](transports.md) the same methods are reached through one generic `Call`
+RPC, and over MQTT by publishing to `negmasd/<node>/rpc`; in both cases the method
+is named by the path without its leading slash (`respond`, `accept-negotiation`, …)
+and the payload is the same JSON. Neither has a GET/POST distinction, so the
+`Method` column below is HTTP-only.
 
 ## Agent
 
@@ -25,8 +26,8 @@ no GET/POST distinction there, so the `Method` column below is HTTP-only.
 | `GET` | `/peak` | dump this agent's in-memory sessions |
 
 !!! note "`/root` is an alias for `/`"
-    gRPC dispatches by method *name*, and the liveness method is named `root`, so
-    it is published at `/root` as well as `/` to keep the two transports
+    gRPC and MQTT dispatch by method *name*, and the liveness method is named
+    `root`, so it is published at `/root` as well as `/` to keep the transports
     interchangeable. The alias is hidden from `/docs`.
 
 ## Runner

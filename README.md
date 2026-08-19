@@ -4,18 +4,20 @@ Run any [negmas](https://github.com/yasserfarouk/negmas) negotiation **distribut
 
 negmasd reuses negmas's own `SAOMechanism`; it does not reimplement the protocol. The runner runs the real mechanism and forwards only the per-round decisions to the processes that own them. Only **values** cross the wire (plain JSON, never pickled objects), so the pieces can run under different Python versions or on different machines.
 
-The wire is pluggable: **HTTP** (FastAPI) always, and **gRPC** as an optional extra.
+The wire is pluggable: **HTTP** (FastAPI) always, plus **gRPC** and **MQTT** as optional extras. The roles themselves contain no networking code — see [Transports](docs/transports.md).
 
 ## Installation
 
 After installing [uv](https://docs.astral.sh/uv/), clone this repo then:
 
 ```bash
-uv sync                 # HTTP only
-uv sync --extra grpc    # ...plus the optional gRPC transport
+uv sync                             # HTTP only
+uv sync --extra grpc                # ...plus the optional gRPC transport
+uv sync --extra mqtt                # ...plus the optional MQTT transport
+uv sync --extra grpc --extra mqtt   # ...both
 ```
 
-`grpcio` is never required — everything works without it.
+Neither `grpcio` nor `paho-mqtt` is ever required — everything works without them.
 
 ## The three roles
 
@@ -58,7 +60,8 @@ To run the whole thing over gRPC instead:
 negmasd builtin procurement --protocol grpc
 ```
 
-`--protocol http|grpc` works on `runner`, `agent` and `ufun` too. See the full CLI with:
+`--protocol http|grpc|mqtt` works on `runner`, `agent` and `ufun` (MQTT also needs
+`--broker host:port`; `builtin` is HTTP/gRPC only). See the full CLI with:
 
 ```bash
 negmasd --help
@@ -73,9 +76,10 @@ uv run pytest                 # everything (includes real-subprocess HTTP and gR
 uv run pytest -m "not slow"   # skip the subprocess tests
 ```
 
-The gRPC cases skip automatically when the optional extra is not installed, and
-`tests/test_transport_optional.py` asserts that nothing on the HTTP path imports
-`grpc` at all.
+The gRPC and MQTT cases skip automatically when their optional extras are absent,
+and `tests/test_transport_optional.py` asserts that nothing on the HTTP path imports
+`grpc` or `paho` at all. The MQTT suite runs against a real broker started
+in-process (`amqtt`, dev group), so it needs no mosquitto.
 
 ## Documentation
 

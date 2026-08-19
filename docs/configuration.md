@@ -10,7 +10,7 @@ One file per agent. Maps negotiation names to the agent's *private* view of each
 name: seller
 host: 127.0.0.1
 port: 8002
-protocol: http               # how THIS agent serves: http (default) | grpc
+protocol: http               # how THIS agent serves: http | grpc | mqtt
 runner_host: 127.0.0.1
 runner_port: 9010
 runner_protocol: http        # how to REACH the runner
@@ -52,8 +52,14 @@ negotiations:
 
 !!! note "Protocols must agree"
     A role served with `--protocol grpc` must be addressed with `protocol: grpc`
-    wherever it is named, and vice versa. Both default to `http`, and the protocol
-    is per-address, so a deployment may mix them. See [Transports](transports.md).
+    wherever it is named, and vice versa. All default to `http`, and the protocol is
+    per-address, so a deployment may mix them. See [Transports](transports.md).
+
+!!! note "MQTT needs nothing else in the config"
+    Setting `protocol: mqtt` is the *only* config change: the topic is derived from
+    each peer's `host`/`port`, and the broker is given on the command line
+    (`--broker`) rather than per peer. Note that under MQTT `host`/`port` are an
+    identifier, not a TCP endpoint — see [Transports](transports.md).
 
 ### Public vs. private
 
@@ -82,9 +88,9 @@ ufun:
   ufun_id: seller
 ```
 
-The scheme in `base_url` selects the protocol, so `grpc://127.0.0.1:9100` reaches
-a ufun service started with `--protocol grpc`. You may give `host`, `port` and
-`protocol` separately instead of `base_url`.
+The scheme in `base_url` selects the protocol, so `grpc://127.0.0.1:9100` (or
+`mqtt://127.0.0.1:9100`) reaches a ufun service started with that `--protocol`. You
+may give `host`, `port` and `protocol` separately instead of `base_url`.
 
 The ufun service is loaded from a YAML file mapping `ufun_id` → a ufun model:
 

@@ -16,23 +16,39 @@ the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.
   and `Channel` (with both a blocking `call` and an awaitable `acall` — the
   handshake is async, but the per-round `respond` is driven from the synchronous
   mechanism loop). See the *Transports* page in the docs.
+- **MQTT transport**, as an **optional** extra (`uv sync --extra mqtt`). All three
+  roles serve over it with the same bit-exact `n_steps` parity as the other
+  transports. It is broker-mediated, so `--broker host:port` (or
+  `NEGMASD_MQTT_BROKER`) says where the broker is, while the topic is *derived*
+  from each peer's `host`/`port` (`negmasd/<host>_<port>/rpc`) — which means **an
+  existing HTTP config becomes an MQTT config by changing `protocol:` alone**, with
+  no new config fields. Adding it changed zero lines in the HTTP and gRPC adapters;
+  see the *Transports* page, which now documents the transport-independent design
+  and illustrates it across all three protocols.
 - **gRPC transport**, as an **optional** extra (`uv sync --extra grpc`). All
   three roles can serve over it, and outcomes are identical to HTTP. It uses a
   single generic `Call(method, payload_json)` RPC because the config models rely
   on pydantic `extra="allow"` for arbitrary negmas kwargs, which no fixed
   protobuf message can express, and because the wire must stay plain JSON of
   values for cross-version operation.
-- **`--protocol http|grpc`** on `negmasd runner`, `agent`, `ufun` and `builtin`.
+- **`--protocol http|grpc|mqtt`** on `negmasd runner`, `agent` and `ufun`;
+  `--protocol http|grpc` on `builtin`. MQTT adds `--broker host:port`, and `--host`
+  (new on `runner`) is that service's MQTT *identity* — the topic its peers address
+  it by, never a bind address, so HTTP/gRPC still bind all interfaces.
 - **`protocol` config fields**: `protocol` on each partner entry, plus `protocol`
   and `runner_protocol` on an agent config. All default to `http`, so nothing
   opts into gRPC implicitly. Protocols may be mixed per address.
 - `negmasd builtin` prints a single machine-readable
   `builtin ready: {"protocol": …, "runner": …, "agents": {…}, "configs": …}` line,
   so callers can discover the ports actually in use.
-- New test suites: `tests/test_grpc_parity.py` (full-stack gRPC parity,
-  in-process and via real CLI subprocesses, plus the remote-ufun-over-gRPC path),
-  `tests/test_transport_optional.py` (the gRPC-absent guarantees, which run
-  whether or not the extra is installed) and `tests/test_builtin_cli.py`.
+- New test suites: `tests/test_grpc_parity.py` and `tests/test_mqtt_parity.py`
+  (full-stack parity per transport, in-process and via real CLI subprocesses, plus
+  the remote-ufun path), `tests/test_transport_optional.py` (the extra-absent
+  guarantees for *both* optional transports, which run whether or not the extras
+  are installed) and `tests/test_builtin_cli.py`. The two parity suites share
+  `tests/transport_harness.py`, so the only difference between them is how services
+  are started. `tests/conftest.py` starts a real MQTT broker in-process (`amqtt`,
+  dev group), so the MQTT suite needs no mosquitto.
 
 ### Changed
 
@@ -57,6 +73,22 @@ the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - HTTP paths, verbs and response models are unchanged. `HttpChannel` now retries
   with the other verb on a `405`, making `http_method` a hint rather than
   something every caller must know.
+
+- `negmasd builtin` rejects `--protocol mqtt` with a message naming the single-role
+  commands to use instead: its whole job is allocating and substituting real ports,
+  and MQTT has none.
+- Readiness polling (the CLI's config auto-loader, and the test harness) now uses a
+  short per-attempt timeout with retries instead of one long call. Over MQTT a
+  QoS-1 publish to a topic nobody has subscribed to yet is silently discarded by the
+  broker, so a single long attempt simply blocks where HTTP and gRPC would fail fast
+  on connect.
+- `Channel` now declares `timeout` as part of its contract (all three transports
+  already had one). Callers legitimately tighten it: readiness polling needs a short
+  timeout with retries, so two call sites no longer probe for the attribute
+  defensively.
+- The dev group gains `amqtt` (test broker only, never imported by negmasd). It
+  pins `typer==0.27.1`, so the dev environment's typer moves up from 0.16; the suite
+  was verified against it before any MQTT code was written.
 
 ### Fixed
 

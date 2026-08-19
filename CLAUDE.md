@@ -18,7 +18,8 @@ negmasd builtin procurement          # start runner(9010) + buyer(8001) + seller
 negmasd runner --port 9010           # start a single runner service
 negmasd agent <port> --config <f>    # start a single agent service (auto-loads config when ready)
 negmasd ufun <port> --config <f>     # start a utility-function service (for remote ufuns)
-negmasd <any-start-cmd> --protocol grpc   # serve over gRPC (runner|agent|ufun|builtin)
+negmasd runner|agent|ufun --protocol grpc|mqtt   # mqtt also needs --broker H:P
+uv sync --extra mqtt                 # optional MQTT transport (paho-mqtt)
 .venv/bin/python -m pytest tests/    # run the test suite (pytest 9.x in the venv)
 .venv/bin/python -m pytest tests/ -m "not slow"   # skip the subprocess full-stack tests
 .venv/bin/python ...                 # invoke python directly; `python` is not on PATH
@@ -87,18 +88,21 @@ Exact parity is proven for **step-bounded** (`n_steps`) negotiations with **`sto
 
 - **`base.py`** — `Address(host, port, protocol)`; `MethodSpec` / `Service` (the method table); `Channel` (a connection to one peer, with **both** `call` (sync) and `acall` (async) — both are required: the handshake calls are awaited, but the per-round `respond` is made from the synchronous `Mechanism.run` loop); plus the protocol registries.
 - **`http.py`** — `HttpChannel` (keeps one `httpx.Client` for the channel's lifetime, so the per-round call reuses a connection) and `build_app(service)`, which registers one FastAPI route per `MethodSpec`. HTTP paths and verbs are unchanged from when the endpoints were hand-decorated.
+- **`mqtt.py`** — `MqttChannel` and `serve_mqtt`, over a broker. `Address(host, port)` still means *which peer*; the topic is derived (`negmasd/<host>_<port>/rpc`) so an existing HTTP config becomes MQTT by changing `protocol:` alone. The broker is process-level (`--broker`, `NEGMASD_MQTT_BROKER`). Correlation rides in the payload (not MQTT 5 response-topic), so any 3.1.1/5 broker works. Server owns a thread+loop for the same `create_task` reason as gRPC. **Two MQTT-specific traps:** `host:port` is an identifier that nothing binds, so a duplicate collides *silently*; and a publish to a topic with no subscriber yet is *discarded*, so readiness must be polled with short timeouts and retries rather than one long call.
 - **`grpc.py`** — `GrpcChannel` and `serve_grpc`. A single generic `Call(method, payload_json) -> Reply(payload_json)` RPC (`negmasd.proto`), *not* typed messages per endpoint: the config models set pydantic `extra="allow"` to pass arbitrary negmas constructor kwargs into `make_object`, which no fixed proto can express, and a shared generated schema would break the cross-version guarantee described under "Why exact parity is achievable" above. The server is `grpc.aio` because `RunnerService.run_negotiation` uses `asyncio.create_task`.
 
 Rules that keep this coherent — **don't regress these**:
 
-1. **gRPC is optional and must stay optional.** `grpcio` is a compiled wheel that fails to install on some Python builds. It lives behind the `grpc` extra; the registry stores only a *module-path string* for that protocol, so nothing imports `grpc` until a gRPC peer is actually addressed. `tests/test_transport_optional.py` enforces this by blocking the import in a subprocess — it runs whether or not the extra is installed.
-2. **A method's *name* must be addressable on every transport.** gRPC dispatches by name, so `build_app` also publishes a `/<name>` alias when a spec overrides its HTTP `path` (only the root health check does, at `/`). Without it a caller reaches a method over gRPC but 404s over HTTP. Asserted by `test_http_and_grpc_expose_the_same_methods`.
+1. **gRPC and MQTT are optional and must stay optional.** `grpcio` is a compiled wheel that fails to install on some Python builds; `paho-mqtt` is only wanted by MQTT deployments. Each lives behind its extra, and the registry stores only a *module-path string*, so nothing imports `grpc`/`paho` until a peer using that protocol is addressed. `tests/test_transport_optional.py` enforces this for both by blocking the import in a subprocess — it runs whether or not the extras are installed.
+2. **A method's *name* must be addressable on every transport.** gRPC and MQTT dispatch by name, so `build_app` also publishes a `/<name>` alias when a spec overrides its HTTP `path` (only the root health check does, at `/`). Without it a caller reaches a method over gRPC but 404s over HTTP. Asserted by `test_http_and_grpc_expose_the_same_methods`.
 3. **`respond` keeps `response_model=None`.** The wire-encoded `SAOState`/`SAOResponse` must pass through the table as a raw dict; a pydantic round-trip is exactly where `ResponseType` collapses to `{}` and outcome tuples degrade to lists (see the wire invariants above).
-4. **`http_method` is a hint.** It is read only by the FastAPI adapter (gRPC has no GET/POST distinction), and `HttpChannel` retries with the other verb on a 405, so protocol-agnostic call sites need not know HTTP verbs.
+4. **`http_method` is a hint.** It is read only by the FastAPI adapter (gRPC and MQTT have no GET/POST distinction), and `HttpChannel` retries with the other verb on a 405, so protocol-agnostic call sites need not know HTTP verbs.
 
 Channels are cached per `(protocol, host, port)` for the process lifetime (that cache *is* the connection reuse); `close_all_channels()` resets it, which is what the tests use between cases.
 
-Adding a protocol means implementing a `Channel` plus a serve function and registering both — no negotiation logic changes.
+Adding a protocol means implementing a `Channel` plus a serve function and registering both — no negotiation logic changes. MQTT is the evidence: it changed **zero lines** in `http.py`/`grpc.py` and added no field to `Address` or any config model.
+
+Tests for a new transport should reuse `tests/transport_harness.py` (scenario, configs, driving) so the only per-transport difference is how services are started.
 
 ## Docs
 

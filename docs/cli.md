@@ -2,8 +2,9 @@
 
 The `negmasd` command (a [Typer](https://typer.tiangolo.com/) app) starts the services.
 
-Every start command takes `--protocol http|grpc` (default `http`). `grpc` needs
-the optional extra — see [Transports](transports.md).
+Every start command takes `--protocol http|grpc|mqtt` (default `http`); `grpc` and
+`mqtt` need their optional extras, and `mqtt` also needs `--broker` — see
+[Transports](transports.md). `builtin` supports `http` and `grpc` only.
 
 ```bash
 negmasd --help
@@ -21,7 +22,7 @@ negmasd builtin procurement
 |--------|---------|---------|
 | `--base-port` | 8000 | agents *prefer* `base_port + 1, +2, …` |
 | `--runner-port` | 9010 | preferred runner port; pass `0` to use an already-running runner |
-| `--protocol` | `http` | serve every role over `http` or `grpc` |
+| `--protocol` | `http` | serve every role over `http` or `grpc` (not `mqtt`, see below) |
 | `--host` | `127.0.0.1` | address written into the generated configs |
 | `--load-configs / --no-load-configs` | load | rewrite and load each config after startup |
 
@@ -59,6 +60,10 @@ port would leave the agents pointing at the wrong places. Free those ports, pick
 others with --base-port / --runner-port, or drop --no-load-configs.
 ```
 
+`--protocol mqtt` is rejected here too: `builtin` exists to allocate and substitute
+real ports, and MQTT has none (`host:port` is a topic identifier there). It exits
+non-zero, naming the single-role commands to run instead.
+
 ## `negmasd runner`
 
 Start a single runner. You need exactly one running.
@@ -66,7 +71,12 @@ Start a single runner. You need exactly one running.
 ```bash
 negmasd runner --port 9010
 negmasd runner --port 9010 --protocol grpc
+negmasd runner --port 9010 --protocol mqtt --broker broker.local:1883
 ```
+
+Under MQTT, `--host` (default `127.0.0.1`) is this service's *identity* as its peers
+have it configured — it forms the topic `negmasd/<host>_<port>/rpc` and is not a
+bind address. It must match the partner entries that name this service.
 
 ## `negmasd agent`
 
@@ -75,6 +85,7 @@ Start a single agent. If `--config` is given it is loaded automatically once the
 ```bash
 negmasd agent 8001 --config path/to/buyer.yml
 negmasd agent 8001 --config path/to/buyer.yml --protocol grpc
+negmasd agent 8001 --config buyer.yml --protocol mqtt --broker broker.local:1883
 ```
 
 ## `negmasd ufun`

@@ -18,8 +18,9 @@ The runner runs the real `SAOMechanism` but adds a `SAORemoteNegotiator` proxy p
 
 - Strategy + ufun **stay in the partner's process** — the runner only ever sees a no-ufun proxy and the per-round response.
 - Parties can run different Python versions / machines.
-- Each round costs one network round-trip (over HTTP or [gRPC](transports.md); the
-  connection is reused across rounds).
+- Each round costs one network round-trip (over HTTP, gRPC or MQTT — see
+  [Transports](transports.md)); the connection is reused across rounds, and under
+  MQTT the round trip is two broker hops.
 
 Use it when negotiators are owned by different parties or must run elsewhere.
 
