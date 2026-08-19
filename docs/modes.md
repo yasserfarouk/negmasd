@@ -4,7 +4,7 @@ Each negotiation declares a `mode` (default `distributed`). Both modes reach **b
 
 ## `centralized`
 
-The runner pulls each partner's strategy + ufun (via `GET /neg-strategy`), builds the negotiators locally, and runs the whole `SAOMechanism` in its own process.
+The runner pulls each partner's strategy + ufun (via `neg-strategy`), builds the negotiators locally, and runs the whole `SAOMechanism` in its own process.
 
 - This **is** negmas running in one process — parity is trivially exact and validates config serialization fidelity.
 - Strategy and ufun leave the partner's process (the runner sees them).
@@ -14,11 +14,12 @@ Use it when the parties trust the runner with their strategy/ufun, or for fast l
 
 ## `distributed`
 
-The runner runs the real `SAOMechanism` but adds a `SAORemoteNegotiator` proxy per partner. Every per-round `negotiator(state)` is forwarded over JSON to the partner's `/respond`, where the partner's real negotiator runs.
+The runner runs the real `SAOMechanism` but adds a `SAORemoteNegotiator` proxy per partner. Every per-round `negotiator(state)` is forwarded as JSON to the partner's `respond`, where the partner's real negotiator runs.
 
 - Strategy + ufun **stay in the partner's process** — the runner only ever sees a no-ufun proxy and the per-round response.
 - Parties can run different Python versions / machines.
-- Each round costs an HTTP round-trip.
+- Each round costs one network round-trip (over HTTP or [gRPC](transports.md); the
+  connection is reused across rounds).
 
 Use it when negotiators are owned by different parties or must run elsewhere.
 

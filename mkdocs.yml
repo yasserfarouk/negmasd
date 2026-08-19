@@ -49,7 +49,9 @@ markdown_extensions:
       alternate_style: true
   - pymdownx.details
   - pymdownx.inlinehilite
-  - pymdownx.snippets
+  - pymdownx.snippets:
+      base_path: ['.']
+      check_paths: true
 
 plugins:
   - search
@@ -62,4 +64,6 @@ nav:
   - Configuration: configuration.md
   - CLI: cli.md
   - Exact parity: parity.md
-  - HTTP API: api.md
+  - Transports: transports.md
+  - API reference: api.md
+  - Changelog: changelog.md

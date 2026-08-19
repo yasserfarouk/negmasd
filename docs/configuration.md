@@ -10,14 +10,17 @@ One file per agent. Maps negotiation names to the agent's *private* view of each
 name: seller
 host: 127.0.0.1
 port: 8002
+protocol: http               # how THIS agent serves: http (default) | grpc
 runner_host: 127.0.0.1
 runner_port: 9010
+runner_protocol: http        # how to REACH the runner
 negotiations:
   trade:
     name: trade
     mode: distributed          # distributed (default) | centralized
     seed: 42                   # optional; reproducible runs
     partners:
+      # `protocol` is how to reach that partner; omit for http
       - { name: buyer,  host: 127.0.0.1, port: 8001 }
       - { name: seller, host: 127.0.0.1, port: 8002 }
     outcome_space:
@@ -42,7 +45,15 @@ negotiations:
 ```
 
 !!! warning "Use `host:` not `address:`"
-    `PartnerModel` expects `host:`. An `address:` key is silently ignored and `host` defaults to `127.0.0.1`.
+    `PartnerModel` expects `host:`. An `address:` key is silently ignored and `host`
+    then quietly defaults to `127.0.0.1` — which looks fine locally and breaks the
+    moment anything is remote. (`negmasd builtin` normalises `address:` to `host:`
+    in the configs it generates, but hand-written configs are on their own.)
+
+!!! note "Protocols must agree"
+    A role served with `--protocol grpc` must be addressed with `protocol: grpc`
+    wherever it is named, and vice versa. Both default to `http`, and the protocol
+    is per-address, so a deployment may mix them. See [Transports](transports.md).
 
 ### Public vs. private
 
@@ -56,6 +67,10 @@ port: 9010
 keep_trace: true   # store the full negotiation trace in the runner's memory
 ```
 
+The runner is told which protocol to serve on the command line
+(`negmasd runner --protocol …`), not in this file; agents name it via their own
+`runner_protocol`.
+
 ## Remote ufun
 
 To run a ufun in its own process, point the negotiation's `ufun` at a ufun service:
@@ -66,6 +81,10 @@ ufun:
   base_url: http://127.0.0.1:9100
   ufun_id: seller
 ```
+
+The scheme in `base_url` selects the protocol, so `grpc://127.0.0.1:9100` reaches
+a ufun service started with `--protocol grpc`. You may give `host`, `port` and
+`protocol` separately instead of `base_url`.
 
 The ufun service is loaded from a YAML file mapping `ufun_id` → a ufun model:
 
@@ -86,7 +105,7 @@ seller:
 | Field | Default | Meaning |
 |-------|---------|---------|
 | `name` | — | negotiation name (key used by `/start-negotiation?neg=`) |
-| `partners` | — | list of `{name, host, port}` |
+| `partners` | — | list of `{name, host, port, protocol}` (`protocol` defaults to `http`) |
 | `outcome_space` | `DiscreteCartesianOutcomeSpace` | shared outcome space |
 | `mechanism` | `SAOMechanism` | mechanism type + kwargs (`n_steps`, `time_limit`, …) |
 | `mode` | `distributed` | `distributed` or `centralized` |
@@ -94,3 +113,13 @@ seller:
 | `random_order` | `false` | shuffle partner order at start |
 | `negotiator` *(private)* | `BoulwareNegotiator` | strategy type + kwargs |
 | `ufun` *(private)* | — | utility function type + kwargs |
+
+Agent-level fields (outside `negotiations`):
+
+| Field | Default | Meaning |
+|-------|---------|---------|
+| `name` | — | this agent's name; partner entries are matched to it by name |
+| `host` / `port` | `127.0.0.1` / — | where this agent serves |
+| `protocol` | `http` | protocol this agent serves on |
+| `runner_host` / `runner_port` | `127.0.0.1` / `9010` | where the runner is |
+| `runner_protocol` | `http` | protocol to use when calling the runner |

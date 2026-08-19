@@ -1,6 +1,9 @@
 # Architecture
 
-negmasd has three process roles, each a [FastAPI](https://fastapi.tiangolo.com/) app, driven entirely over HTTP.
+negmasd has three process roles. Each is a plain Python **service** holding no
+transport code: it declares a *method table*, and a transport adapter projects
+that table onto a wire protocol — [FastAPI](https://fastapi.tiangolo.com/) over
+HTTP by default, or gRPC. See [Transports](transports.md).
 
 | Role | Module | Holds | Responsibility |
 |------|--------|-------|----------------|
@@ -8,9 +11,18 @@ negmasd has three process roles, each a [FastAPI](https://fastapi.tiangolo.com/)
 | **Runner** | `negmasd.runner` | nothing private | build and run the real `SAOMechanism`; report results |
 | **ufun service** | `negmasd.ufun_service` | a ufun (+ its outcome space) | evaluate outcomes for a `RemoteUtilityFunction` |
 
+Each role module also exposes a process-wide `service` instance and an
+`app = build_app(service)`, so `uvicorn negmasd.agent:app` works as before. State
+lives on the instance rather than in module globals, which is what allows several
+services in one process.
+
 A negotiation **app** is a folder under `negmasd/apps/<name>/` containing `runner.yml` and `agents/*.yml`. The CLI's `builtin` command launches an app's processes and loads their configs.
 
 ## The negotiation handshake
+
+The labels below are method names. Over HTTP they are the paths and verbs shown
+in the [API reference](api.md); over gRPC they are the `method` field of the
+generic `Call` RPC.
 
 ```mermaid
 sequenceDiagram
@@ -42,7 +54,7 @@ The **initiator** strips its private fields (`PersonalNegotiationModel.remove_pe
 In distributed mode the runner builds the real `SAOMechanism` but adds one **`SAORemoteNegotiator`** per partner instead of the partner's real strategy. The proxy:
 
 - holds **no ufun and no strategy**,
-- on each `__call__(state)`, encodes the state, `POST`s it to the partner's `/respond`, and decodes the returned `SAOResponse`.
+- on each `__call__(state)`, encodes the state, sends it to the partner's `respond` over that partner's protocol, and decodes the returned `SAOResponse`.
 
 The partner's process builds its **real** negotiator once (in `/init-negotiation`, stored in `agent.live_negotiators`) and runs it on each `/respond` call. Because a time-based negotiator's decision is a pure function of the *passed* state plus its own ufun, feeding it the exact per-round states the mechanism produces reproduces an in-process run exactly.
 
@@ -64,7 +76,9 @@ flowchart LR
     N1 -- "JSON response" --> X1
 ```
 
-The synchronous mechanism loop runs in a worker thread (`asyncio.to_thread`) so the per-round blocking HTTP calls don't stall the runner's event loop.
+The synchronous mechanism loop runs in a worker thread (`asyncio.to_thread`) so the per-round blocking calls don't stall the runner's event loop. This is why a transport must offer a **blocking** call form as well as an awaitable one.
+
+The connection to each peer is cached per address, so the per-round call reuses one already-open connection rather than dialling every round.
 
 ## The wire (`negmasd.wire`)
 

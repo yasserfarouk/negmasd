@@ -44,7 +44,7 @@ Exact parity is proven for:
 
 Outside the envelope:
 
-- **`time_limit`** is supported in distributed mode and behaves correctly, but is **not bit-exact** with an in-process run — per-round network latency shifts the wall-clock `relative_time`. This is expected and fine; exact parity is only claimed for `n_steps`.
+- **`time_limit`** is supported in distributed mode and behaves correctly, but is **not bit-exact** with an in-process run — per-round network latency shifts the wall-clock `relative_time`. This is expected and fine; exact parity is only claimed for `n_steps`. It also means a `time_limit` run may differ between transports, since their latencies differ.
 - The agent's negotiator currently receives only `__call__(state)` — no `join`, no `on_negotiation_start` / `on_round_start` / `on_negotiation_end`, no `self.nmi`. Strategies that read those need the agent extended (e.g. host the negotiator in a local mirror mechanism).
 - The wire carries the `SAOState` fields a time-based negotiator reads, not the full state (`current_data` / `new_data` / `threads` / `results` are dropped). Protocols using those need the codec extended.
 
@@ -58,6 +58,16 @@ Outside the envelope:
 - the **timeout / no-agreement** branch, with the invariant `not (agreement and timedout)`.
 
 `tests/test_subprocess_parity.py` proves the **cross-process wire** end-to-end: it launches the runner and agents as real `uvicorn` subprocesses and drives negotiations over HTTP — deal and timeout, in both modes.
+
+`tests/test_grpc_parity.py` does the same over [gRPC](transports.md) — in-process
+servers and real CLI subprocesses, both modes, plus the remote-ufun path — so the
+choice of transport is proven not to change the outcome. It also asserts that the
+HTTP and gRPC adapters expose exactly the same method set, since both are
+projections of one table. These cases skip when the optional extra is absent.
+
+`tests/test_transport_optional.py` checks the guarantees that keep `grpcio`
+optional (nothing on the HTTP path imports it; a missing extra yields one
+actionable error) by blocking the import in a subprocess, so it runs either way.
 
 ```bash
 uv run pytest                 # all of it

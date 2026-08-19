@@ -1,6 +1,14 @@
-# HTTP API
+# API reference
 
-Every role is a FastAPI app, so each exposes interactive docs at `/docs`. The endpoints below are what the roles call on each other; you normally only invoke `/load-config`, `/start-negotiation`, and `/peak` yourself.
+Each role declares a *method table*; what follows is its **HTTP projection**.
+Served over HTTP, every role is a FastAPI app and exposes interactive docs at
+`/docs`. The endpoints below are what the roles call on each other; you normally
+only invoke `/load-config`, `/start-negotiation`, and `/peak` yourself.
+
+Over [gRPC](transports.md) the same methods are reached through one generic
+`Call` RPC whose `method` field is the path without its leading slash
+(`respond`, `accept-negotiation`, …) and whose payload is the same JSON. There is
+no GET/POST distinction there, so the `Method` column below is HTTP-only.
 
 ## Agent
 
@@ -15,6 +23,11 @@ Every role is a FastAPI app, so each exposes interactive docs at `/docs`. The en
 | `POST` | `/respond` | **distributed**: run one round — wire `SAOState` in, wire `SAOResponse` out |
 | `POST` | `/receive-results` | receive final agreement + state |
 | `GET` | `/peak` | dump this agent's in-memory sessions |
+
+!!! note "`/root` is an alias for `/`"
+    gRPC dispatches by method *name*, and the liveness method is named `root`, so
+    it is published at `/root` as well as `/` to keep the two transports
+    interchangeable. The alias is hidden from `/docs`.
 
 ## Runner
 
@@ -35,6 +48,8 @@ Every role is a FastAPI app, so each exposes interactive docs at `/docs`. The en
 | `POST` | `/eval` | `{ufun_id, outcome}` → `{value}` |
 
 ## Wire payloads (distributed mode)
+
+Identical on both transports: gRPC carries this same JSON inside its envelope.
 
 `/respond` request — a wire-encoded `SAOState`:
 

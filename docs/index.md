@@ -14,6 +14,8 @@ A negotiation usually runs in one process: the mechanism, every negotiator, and 
 
 negmasd keeps each party's strategy and ufun in that party's own process. Only **values** cross the wire (plain JSON — never pickled objects), so the pieces can run anywhere.
 
+The wire itself is pluggable: HTTP (FastAPI) always, and **gRPC** as an optional extra. Roles are transport-agnostic, so the protocol is a deployment choice rather than a rewrite — see [Transports](transports.md).
+
 ## The three roles
 
 ```mermaid
@@ -30,6 +32,10 @@ flowchart LR
 - **Runner** — runs the real `SAOMechanism`; one shared service.
 - **ufun service** *(optional)* — holds a ufun and evaluates outcomes for a `RemoteUtilityFunction`.
 
+Each role is a plain Python service that declares a *method table*; a transport
+adapter projects it onto HTTP or gRPC. The arrows above are method names, not
+URLs.
+
 ## Two execution modes
 
 | Mode | What runs where |
@@ -44,3 +50,5 @@ Both reach exact parity with negmas-proper. See [Execution modes](modes.md).
 - [Quickstart](quickstart.md) — run a negotiation in a few commands.
 - [Architecture](architecture.md) — how the handshake and the wire work.
 - [Exact parity](parity.md) — why it is exact, and the proven envelope.
+- [Transports](transports.md) — HTTP and gRPC, and how to add a protocol.
+- [Changelog](changelog.md) — what changed.
