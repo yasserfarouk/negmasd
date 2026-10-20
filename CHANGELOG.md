@@ -9,6 +9,11 @@ the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ### Changed
 
+- **negmas now comes from PyPI (`>=0.16.0`)** instead of an editable `../negmas`
+  path source. uv honours a git dependency's `[tool.uv.sources]`, so the path
+  entry made `negmasd @ git+https://github.com/yasserfarouk/negmasd` fail to
+  install in any other project (the path does not exist in the clone). Develop
+  against a local negmas with `uv pip install -e ../negmas` after `uv sync`.
 - **Python 3.14 is now the default development interpreter** (`.python-version`,
   now checked in rather than gitignored). `requires-python` stays `>=3.11`. The
   compiled dependencies that had no 3.14 wheels (numpy, scipy, pandas,

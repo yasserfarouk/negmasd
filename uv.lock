@@ -1436,7 +1436,7 @@ wheels = [
 [[package]]
 name = "negmas"
 version = "0.16.0"
-source = { editable = "../negmas" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
     { name = "click" },
@@ -1469,76 +1469,10 @@ dependencies = [
     { name = "typer" },
     { name = "typing-extensions" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "attrs", specifier = ">=24.2.0" },
-    { name = "bumpversion", marker = "extra == 'dev'", specifier = ">=0.6.0" },
-    { name = "click", specifier = ">=8.1.7" },
-    { name = "click-config-file", specifier = ">=0.6.0" },
-    { name = "cloudpickle", specifier = ">=3.1.0" },
-    { name = "codacy-coverage", marker = "extra == 'dev'", specifier = ">=1.3.11" },
-    { name = "colorlog", specifier = ">=6.9.0" },
-    { name = "coverage", marker = "extra == 'dev'", specifier = ">=7.6.5" },
-    { name = "dill", specifier = ">=0.3.9" },
-    { name = "docutils", marker = "extra == 'dev'", specifier = ">=0.21.2" },
-    { name = "furo", marker = "extra == 'docs'", specifier = ">=2024.1.29" },
-    { name = "gif", specifier = ">=23.3.0" },
-    { name = "hypothesis", marker = "extra == 'testing'", specifier = ">=6.118.8" },
-    { name = "inflect", specifier = ">=4.1.0,<6.0" },
-    { name = "ipykernel", marker = "extra == 'dev'", specifier = ">=6.29.5" },
-    { name = "jupyter", marker = "extra == 'dev'", specifier = ">=1.1.1" },
-    { name = "kaleido", specifier = ">=1.0" },
-    { name = "markupsafe", marker = "extra == 'dev'", specifier = ">=3.0.2" },
-    { name = "matplotlib", specifier = ">=3.7.0" },
-    { name = "nashpy", marker = "extra == 'egta'", specifier = ">=0.0.41" },
-    { name = "nbformat", marker = "extra == 'docs'", specifier = ">=5.10.4" },
-    { name = "nbsphinx", marker = "extra == 'docs'", specifier = ">=0.9.6" },
-    { name = "networkx", specifier = ">=3.4.2" },
-    { name = "notebook", marker = "extra == 'docs'", specifier = "==6.4.12" },
-    { name = "numpy" },
-    { name = "pandas", specifier = ">=2.2.3" },
-    { name = "pandoc", marker = "extra == 'dev'", specifier = ">=2.4" },
-    { name = "papermill", marker = "extra == 'dev'", specifier = ">=2.6.0" },
-    { name = "pebble", specifier = ">=5.2.0" },
-    { name = "pillow", specifier = ">=12.1.0" },
-    { name = "pillow", marker = "extra == 'docs'", specifier = ">=12.1.0" },
-    { name = "plotly", specifier = ">=6.1.1" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.0.1" },
-    { name = "psutil", specifier = ">=6.1.0" },
-    { name = "py4j", specifier = ">=0.10.9.7" },
-    { name = "pyarrow", specifier = ">=22.0.0" },
-    { name = "pyqt5", marker = "extra == 'gui'", specifier = ">=5.15.11" },
-    { name = "pytest", marker = "extra == 'testing'", specifier = ">=8.3.3" },
-    { name = "pytest-check", marker = "extra == 'testing'", specifier = ">=2.4.1" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.0.0" },
-    { name = "pytest-sugar", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "pytest-timeout", marker = "extra == 'testing'", specifier = ">=2.3.1" },
-    { name = "pyyaml", specifier = ">=6.0.2" },
-    { name = "readme-renderer", marker = "extra == 'dev'", specifier = ">=44.0" },
-    { name = "recommonmark", marker = "extra == 'dev'", specifier = ">=0.7.1" },
-    { name = "rich", specifier = ">=13.9.4" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11.0" },
-    { name = "scikit-learn", specifier = ">=1.5.2" },
-    { name = "scipy", specifier = ">=1.14.1" },
-    { name = "seaborn", marker = "extra == 'dev'", specifier = ">=0.13.0" },
-    { name = "setuptools", specifier = ">=83.0.0" },
-    { name = "sphinx", marker = "extra == 'docs'", specifier = ">=7.0.0" },
-    { name = "sphinx-autodoc-typehints", marker = "python_full_version >= '3.11' and extra == 'docs'", specifier = ">=3.0.0" },
-    { name = "sphinx-autodoc-typehints", marker = "python_full_version < '3.11' and extra == 'docs'", specifier = ">=2.0.0,<3.0.0" },
-    { name = "sphinx-click", marker = "extra == 'docs'", specifier = ">=6.0.0" },
-    { name = "sphinx-copybutton", marker = "extra == 'docs'", specifier = ">=0.5.2" },
-    { name = "sphinx-tabs", marker = "extra == 'docs'", specifier = ">=3.4.7" },
-    { name = "sphinxcontrib-typer", marker = "extra == 'docs'", specifier = ">=0.5.0" },
-    { name = "stringcase", specifier = ">=1.2.0" },
-    { name = "tabulate", specifier = ">=0.9.0" },
-    { name = "tox", marker = "extra == 'dev'", specifier = ">=4.23.2" },
-    { name = "twine", marker = "extra == 'dev'", specifier = ">=5.1.1" },
-    { name = "typer", specifier = ">=0.13.0" },
-    { name = "typing-extensions", specifier = ">=4.12.2" },
-    { name = "wheel", marker = "extra == 'dev'", specifier = ">=0.46.2" },
+sdist = { url = "https://files.pythonhosted.org/packages/72/61/1c12d915e5bed01e346566cf39913c080c3bbcbd861a87f4d522b258190c/negmas-0.16.0.tar.gz", hash = "sha256:c4bde84532fff62748f468f85704e7a2be0fd85808dccfd0b912548df0209e21", size = 1018656, upload-time = "2026-09-01T07:20:14.323Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ab/8a/77c1c00af857e9bca45e3c4327499c7b6507ef7d477c1d5e9c852a8d014f/negmas-0.16.0-py3-none-any.whl", hash = "sha256:cb5c2b14156a4aabec78df68136b99833ae0eb4075ed8f7525fff2322e72e42d", size = 1129303, upload-time = "2026-09-01T07:20:12.417Z" },
 ]
-provides-extras = ["gui", "egta", "testing", "docs", "dev"]
 
 [[package]]
 name = "negmasd"
@@ -1577,7 +1511,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115.12" },
     { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.60" },
     { name = "httpx", specifier = ">=0.28.1" },
-    { name = "negmas", editable = "../negmas" },
+    { name = "negmas", specifier = ">=0.16.0" },
     { name = "paho-mqtt", marker = "extra == 'mqtt'", specifier = ">=2.0" },
     { name = "pydantic", specifier = ">=2.11.5" },
     { name = "pyyaml", specifier = ">=6.0.2" },

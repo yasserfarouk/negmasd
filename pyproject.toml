@@ -10,7 +10,7 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.12",
     "httpx>=0.28.1",
-    "negmas>=0.11.3",
+    "negmas>=0.16.0",
     "pydantic>=2.11.5",
     "pyyaml>=6.0.2",
     "requests>=2.32.3",
@@ -26,9 +26,6 @@ dependencies = [
 [project.optional-dependencies]
 grpc = ["grpcio>=1.60"]
 mqtt = ["paho-mqtt>=2.0"]
-
-[tool.uv.sources]
-negmas = { path = "../negmas", editable = true }
 
 [project.scripts]
 negmasd = "negmasd:cli.app"
