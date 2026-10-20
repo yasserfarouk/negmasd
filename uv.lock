@@ -1245,7 +1245,7 @@ wheels = [
 [[package]]
 name = "negmas"
 version = "0.16.0"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/yasserfarouk/negmas#c0ccb5b9ecb67bd17d719cfe9cb0bc927ac61ec1" }
 dependencies = [
     { name = "attrs" },
     { name = "click" },
@@ -1275,10 +1275,6 @@ dependencies = [
     { name = "tabulate" },
     { name = "typer" },
     { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/72/61/1c12d915e5bed01e346566cf39913c080c3bbcbd861a87f4d522b258190c/negmas-0.16.0.tar.gz", hash = "sha256:c4bde84532fff62748f468f85704e7a2be0fd85808dccfd0b912548df0209e21", size = 1018656, upload-time = "2026-09-01T07:20:14.323Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ab/8a/77c1c00af857e9bca45e3c4327499c7b6507ef7d477c1d5e9c852a8d014f/negmas-0.16.0-py3-none-any.whl", hash = "sha256:cb5c2b14156a4aabec78df68136b99833ae0eb4075ed8f7525fff2322e72e42d", size = 1129303, upload-time = "2026-09-01T07:20:12.417Z" },
 ]
 
 [[package]]
@@ -1318,7 +1314,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115.12" },
     { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.60" },
     { name = "httpx", specifier = ">=0.28.1" },
-    { name = "negmas", specifier = ">=0.16.0" },
+    { name = "negmas", git = "https://github.com/yasserfarouk/negmas" },
     { name = "paho-mqtt", marker = "extra == 'mqtt'", specifier = ">=2.0" },
     { name = "pydantic", specifier = ">=2.11.5" },
     { name = "pyyaml", specifier = ">=6.0.2" },

@@ -8,7 +8,7 @@ negmasd uses [uv](https://docs.astral.sh/uv/). After cloning:
 uv sync
 ```
 
-This creates a virtual environment and installs negmasd and its dependencies (including [negmas](https://github.com/yasserfarouk/negmas) from PyPI).
+This creates a virtual environment and installs negmasd and its dependencies (including [negmas](https://github.com/yasserfarouk/negmas), from its latest commit on GitHub).
 
 To also install the optional [gRPC transport](transports.md):
 

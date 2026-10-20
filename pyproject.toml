@@ -27,6 +27,12 @@ dependencies = [
 grpc = ["grpcio>=1.60"]
 mqtt = ["paho-mqtt>=2.0"]
 
+# negmas tracks the latest commit on GitHub; uv.lock pins the exact commit.
+# A git URL (unlike a ../negmas path) resolves for anyone installing negmasd
+# from GitHub. Refresh with: uv lock --upgrade-package negmas
+[tool.uv.sources]
+negmas = { git = "https://github.com/yasserfarouk/negmas" }
+
 [project.scripts]
 negmasd = "negmasd:cli.app"
 

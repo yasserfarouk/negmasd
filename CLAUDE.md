@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `negmasd` distributes a [negmas](https://github.com/yasserfarouk/negmas) negotiation across processes/machines. Each role is a transport-agnostic service; HTTP (FastAPI) and gRPC are both supported. The goal is to run any negmas mechanism (primarily bilateral `SAOMechanism`) with each negotiator — and optionally each ufun — in its own process.
 
-`negmas` is installed from PyPI. Do **not** add a `[tool.uv.sources]` path entry for it: uv honours a git dependency's sources, so a `../negmas` path breaks every project that installs negmasd from GitHub (the path does not exist in the clone). To develop against a local negmas checkout, run `uv pip install -e ../negmas` after `uv sync`.
+`negmas` is installed from the latest commit on GitHub (`[tool.uv.sources]` git entry; `uv.lock` pins the commit, refresh with `uv lock --upgrade-package negmas`). Do **not** change that to a `../negmas` path: uv honours a git dependency's sources, so a path breaks every project that installs negmasd from GitHub (the path does not exist in the clone). To develop against a local negmas checkout, run `uv pip install -e ../negmas` after `uv sync`.
 
 ## Commands
 

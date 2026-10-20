@@ -12,8 +12,10 @@ the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - **`requires-python` is now `>=3.12`.** `models.py` uses PEP 695 generics
   (`class MakableModel[T]`), a `SyntaxError` before 3.12, so the advertised 3.11
   support never worked.
-- **negmas now comes from PyPI (`>=0.16.0`)** instead of an editable `../negmas`
-  path source. uv honours a git dependency's `[tool.uv.sources]`, so the path
+- **negmas now comes from the latest commit on GitHub** (a `[tool.uv.sources]`
+  git entry, pinned to a commit in `uv.lock`; refresh with
+  `uv lock --upgrade-package negmas`) instead of an editable `../negmas` path
+  source. uv honours a git dependency's `[tool.uv.sources]`, so the path
   entry made `negmasd @ git+https://github.com/yasserfarouk/negmasd` fail to
   install in any other project (the path does not exist in the clone). Develop
   against a local negmas with `uv pip install -e ../negmas` after `uv sync`.
