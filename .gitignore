@@ -232,7 +232,6 @@
 .pytest_cache
 .pytest_cache/
 .pytest_cache/*
-.python-version
 .pytype/
 .ropeproject
 .ropeproject

@@ -7,6 +7,15 @@ the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Changed
+
+- **Python 3.14 is now the default development interpreter** (`.python-version`,
+  now checked in rather than gitignored). `requires-python` stays `>=3.11`. The
+  compiled dependencies that had no 3.14 wheels (numpy, scipy, pandas,
+  scikit-learn, matplotlib, contourpy, kiwisolver, markupsafe, pydantic-core,
+  pyyaml, rpds-py) were upgraded in `uv.lock`; numpy, scipy and contourpy now
+  resolve to older releases on 3.11, which their newest releases no longer support.
+
 ### Documentation
 
 - The **two execution modes** (`centralized` vs. `distributed`) are now the first
