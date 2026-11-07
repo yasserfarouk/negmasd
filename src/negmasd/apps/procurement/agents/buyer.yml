@@ -11,7 +11,7 @@ negotiations:
         address: 127.0.0.1
         port: 8002
     outcome_space:
-      type: negmas.outcomes.DiscreteCartesianOutcomeSpace
+      type: negmas.outcomes.EnumerableCartesianOutcomeSpace
       issues:
         - name: price
           type: negmas.outcomes.DiscreteCardinalIssue
