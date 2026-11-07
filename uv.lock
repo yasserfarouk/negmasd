@@ -1244,8 +1244,8 @@ wheels = [
 
 [[package]]
 name = "negmas"
-version = "0.16.0"
-source = { git = "https://github.com/yasserfarouk/negmas#c0ccb5b9ecb67bd17d719cfe9cb0bc927ac61ec1" }
+version = "0.17.0"
+source = { git = "https://github.com/yasserfarouk/negmas#9d7467042f5d2edca439aa4b8ff1ba2d95435778" }
 dependencies = [
     { name = "attrs" },
     { name = "click" },
