@@ -52,7 +52,7 @@ class OutcomeSpaceModel(MakableModel[OutcomeSpace]):
     """
 
     type: str = Field(
-        default="negmas.outcomes.outcome_space.DiscreteCartesianOutcomeSpace",
+        default="negmas.outcomes.outcome_space.EnumerableCartesianOutcomeSpace",
         description="Outcome-space to use for a negotiation",
     )
 

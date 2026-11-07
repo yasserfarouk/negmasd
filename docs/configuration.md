@@ -24,7 +24,7 @@ negotiations:
       - { name: buyer,  host: 127.0.0.1, port: 8001 }
       - { name: seller, host: 127.0.0.1, port: 8002 }
     outcome_space:
-      type: negmas.outcomes.DiscreteCartesianOutcomeSpace
+      type: negmas.outcomes.EnumerableCartesianOutcomeSpace
       issues:
         - { name: price,    type: negmas.outcomes.DiscreteCardinalIssue, values: [100, 150, 200, 250, 300] }
         - { name: quantity, type: negmas.outcomes.ContiguousIssue,       values: [1, 10] }
@@ -99,7 +99,7 @@ The ufun service is loaded from a YAML file mapping `ufun_id` → a ufun model:
 seller:
   type: negmas.preferences.crisp.linear.LinearAdditiveUtilityFunction
   outcome_space:                 # include so the service can build it
-    type: negmas.outcomes.DiscreteCartesianOutcomeSpace
+    type: negmas.outcomes.EnumerableCartesianOutcomeSpace
     issues: [ ... ]
   weights: [0.00166667, 0.05]
   values: [ ... ]
@@ -112,7 +112,7 @@ seller:
 |-------|---------|---------|
 | `name` | — | negotiation name (key used by `/start-negotiation?neg=`) |
 | `partners` | — | list of `{name, host, port, protocol}` (`protocol` defaults to `http`) |
-| `outcome_space` | `DiscreteCartesianOutcomeSpace` | shared outcome space |
+| `outcome_space` | `EnumerableCartesianOutcomeSpace` | shared outcome space |
 | `mechanism` | `SAOMechanism` | mechanism type + kwargs (`n_steps`, `time_limit`, …) |
 | `mode` | `distributed` | `distributed` or `centralized` |
 | `seed` | `None` | seed applied right before `mechanism.run()` |
